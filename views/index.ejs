@@ -1,0 +1,101 @@
+<div class="jumbotron text-center mb-5">
+    <h1 class="display-4">Welcome to Debbah Weather</h1>
+    <p class="lead">Check weather instantly or save your favorite locations.</p>
+</div>
+
+<!-- Guest Weather Search -->
+<div class="row justify-content-center mb-5">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white text-center">
+                <h4 class="mb-0"><i class="fas fa-search me-2"></i>Check Weather Instantly</h4>
+            </div>
+            <div class="card-body">
+                <form id="guestWeatherForm">
+                    <div class="mb-3 location-selector">
+                        <label for="guestLocationInput" class="form-label">Search Any Location</label>
+                        <input type="text" class="form-control form-control-lg" id="guestLocationInput" 
+                               placeholder="Enter city, region, or country (e.g., Paris, London, New York)" 
+                               required autocomplete="off">
+                        <div class="location-suggestions" id="guestLocationSuggestions" style="display: none;"></div>
+                        <input type="hidden" id="guestSelectedLat">
+                        <input type="hidden" id="guestSelectedLon">
+                        <input type="hidden" id="guestSelectedName">
+                        <input type="hidden" id="guestSelectedCountry">
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-cloud-sun me-2"></i>Get Weather
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Guest Weather Display -->
+<div class="row justify-content-center mb-5" id="guestWeatherSection" style="display: none;">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Weather Information</h5>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="guestUnitToggle">
+                        <label class="form-check-label" for="guestUnitToggle">°C / °F</label>
+                    </div>
+                    <button class="btn btn-success btn-sm" id="saveLocationBtn" style="display: none;">
+                        <i class="fas fa-heart me-1"></i>Save Location
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="guestWeatherContent">
+                    <!-- Weather content will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<hr class="my-5">
+
+<div class="text-center mb-4">
+    <h3>Want to Save Your Favorite Locations?</h3>
+    <p class="text-muted">Create an account to save and manage your favorite weather locations</p>
+    <div class="mt-3">
+        <a href="/register" class="btn btn-primary btn-lg me-3">Sign Up</a>
+        <a href="/login" class="btn btn-outline-primary btn-lg">Login</a>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-cloud-sun fa-3x text-primary mb-3"></i>
+                <h3>Real-time Weather</h3>
+                <p>Get up-to-date weather information for your favorite locations.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-map-marker-alt fa-3x text-primary mb-3"></i>
+                <h3>Save Locations</h3>
+                <p>Save multiple cities and access their weather data with a single click.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-mobile-alt fa-3x text-primary mb-3"></i>
+                <h3>Responsive Design</h3>
+                <p>Access your weather information from any device, anywhere.</p>
+            </div>
+        </div>
+    </div>
+</div>

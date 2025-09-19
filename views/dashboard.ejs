@@ -1,0 +1,113 @@
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Add Location</h5>
+            </div>
+            <div class="card-body">
+                <form id="addCityForm">
+                    <div class="mb-3 location-selector">
+                        <label for="locationInput" class="form-label">Search Location</label>
+                        <input type="text" class="form-control" id="locationInput" 
+                               placeholder="Enter city, region, or country (e.g., Paris, London, New York)" 
+                               required autocomplete="off">
+                        <div class="location-suggestions" id="locationSuggestions" style="display: none;"></div>
+                        <div class="form-text">Search for any city, region, or country worldwide</div>
+                        <input type="hidden" id="selectedLat">
+                        <input type="hidden" id="selectedLon">
+                        <input type="hidden" id="selectedName">
+                        <input type="hidden" id="selectedCountry">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-plus me-2"></i>Add Location
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Weather Provider</h5>
+            </div>
+            <div class="card-body">
+                <div class="provider-selector">
+                    <button class="provider-btn active" data-provider="openweather">
+                        <i class="fas fa-cloud"></i> OpenWeather
+                    </button>
+                    <button class="provider-btn" data-provider="weatherapi">
+                        <i class="fas fa-sun"></i> WeatherAPI
+                    </button>
+                </div>
+                <small class="text-muted">Select your preferred weather data provider</small>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Saved Cities</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="savedCitiesList">
+                    <div class="list-group-item text-center text-muted" id="noCitiesMessage">
+                        No cities saved yet. Add a city to get started!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Weather Information</h5>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="unitToggle">
+                    <label class="form-check-label" for="unitToggle">°C / °F</label>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="weatherContent" class="text-center py-5">
+                    <i class="fas fa-cloud-sun fa-4x text-muted mb-3"></i>
+                    <p class="text-muted">Select a city to view weather information</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Weather Card Template (Hidden) -->
+<template id="weatherCardTemplate">
+    <div class="weather-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="city-name mb-0"></h3>
+            <div class="weather-icon"></div>
+        </div>
+        <div class="temperature">
+            <span class="temp-value"></span>
+            <span class="temp-unit">°C</span>
+        </div>
+        <div class="weather-description"></div>
+        <div class="weather-details mt-3">
+            <div class="row">
+                <div class="col-6">
+                    <div><i class="fas fa-tint"></i> Humidity: <span class="humidity"></span>%</div>
+                    <div><i class="fas fa-wind"></i> Wind: <span class="wind-speed"></span> m/s</div>
+                </div>
+                <div class="col-6">
+                    <div><i class="fas fa-arrow-up"></i> H: <span class="temp-max"></span>°</div>
+                    <div><i class="fas fa-arrow-down"></i> L: <span class="temp-min"></span>°</div>
+                </div>
+            </div>
+        </div>
+        <div class="last-updated mt-3 text-muted small"></div>
+    </div>
+</template>
+
+<!-- Loading Spinner Template (Hidden) -->
+<template id="loadingSpinnerTemplate">
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+</template>
