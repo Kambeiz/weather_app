@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "D Weather - A weather application that allows users to save favorite cities and check the weather",
   "main": "app.js",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
