@@ -5,7 +5,8 @@ const session = require('express-session');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const expressLayouts = require('express-ejs-layouts');
-const { createUser, findUserByUsername } = require('./database/db');
+// Switch to memory database for Vercel serverless compatibility
+const { createUser, findUserByUsername } = require('./database/memoryDb');
 const apiRoutes = require('./routes/api');
 
 const app = express();

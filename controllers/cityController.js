@@ -1,4 +1,4 @@
-const { query, run } = require('../database/db');
+const { query, run, getUserFavoriteCities: getDbFavoriteCities, addFavoriteCity: addDbFavoriteCity, removeFavoriteCity: removeDbFavoriteCity } = require('../database/memoryDb');
 const { getWeatherData } = require('../services/weatherService');
 
 /**
@@ -8,15 +8,7 @@ const { getWeatherData } = require('../services/weatherService');
  */
 async function getUserFavoriteCities(userId) {
   try {
-    const cities = await query(
-      `SELECT id, city_name, country_code, lat, lon 
-       FROM favorite_cities 
-       WHERE user_id = ? 
-       ORDER BY created_at DESC`,
-      [userId]
-    );
-    
-    return cities;
+    return await getDbFavoriteCities(userId);
   } catch (error) {
     console.error('Error getting user favorite cities:', error);
     throw error;
@@ -34,27 +26,9 @@ async function getUserFavoriteCities(userId) {
  */
 async function addFavoriteCity(userId, cityName, countryCode, lat, lon) {
   try {
-    // Check if the city is already in favorites
-    const existingCity = await query(
-      `SELECT id FROM favorite_cities 
-       WHERE user_id = ? AND lat = ? AND lon = ?`,
-      [userId, lat, lon]
-    );
-    
-    if (existingCity.length > 0) {
-      throw new Error('This city is already in your favorites');
-    }
-    
-    // Add the city to favorites
-    const result = await run(
-      `INSERT INTO favorite_cities 
-       (user_id, city_name, country_code, lat, lon) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [userId, cityName, countryCode, lat, lon]
-    );
-    
+    const cityId = await addDbFavoriteCity(userId, cityName, countryCode, lat, lon);
     return {
-      id: result.id,
+      id: cityId,
       city_name: cityName,
       country_code: countryCode,
       lat,
@@ -74,13 +48,7 @@ async function addFavoriteCity(userId, cityName, countryCode, lat, lon) {
  */
 async function removeFavoriteCity(userId, cityId) {
   try {
-    const result = await run(
-      `DELETE FROM favorite_cities 
-       WHERE id = ? AND user_id = ?`,
-      [cityId, userId]
-    );
-    
-    return result.changes > 0;
+    return await removeDbFavoriteCity(userId, cityId);
   } catch (error) {
     console.error('Error removing favorite city:', error);
     throw error;
