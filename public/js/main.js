@@ -996,20 +996,38 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Create map container
         mapContent.innerHTML = `
-            <div class="mb-3">
-                <label class="form-label">Weather Map Layer:</label>
-                <select class="form-select" id="mapLayerSelect" onchange="updateWeatherMapLayer()">
-                    <option value="temp_new">Temperature</option>
-                    <option value="precipitation_new">Precipitation</option>
-                    <option value="wind_new">Wind Speed</option>
-                    <option value="pressure_new">Pressure</option>
-                    <option value="clouds_new">Clouds</option>
-                </select>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Weather Map Layer:</label>
+                    <select class="form-select" id="mapLayerSelect" onchange="updateWeatherMapLayer()">
+                        <option value="temp_new">🌡️ Temperature</option>
+                        <option value="precipitation_new">🌧️ Precipitation</option>
+                        <option value="wind_new">💨 Wind Speed</option>
+                        <option value="pressure_new">🔽 Pressure</option>
+                        <option value="clouds_new">☁️ Cloud Coverage</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Layer Opacity:</label>
+                    <input type="range" class="form-range" id="opacitySlider" min="0.1" max="1" step="0.1" value="0.6" onchange="updateWeatherMapOpacity()">
+                    <small class="text-muted">Adjust weather layer transparency</small>
+                </div>
             </div>
             <div id="weatherMap" style="height: 400px; border-radius: 8px; border: 1px solid #dee2e6;"></div>
-            <div class="mt-2 text-muted small">
-                <i class="fas fa-info-circle me-1"></i>
-                Interactive weather map powered by OpenWeatherMap. Click and drag to pan, scroll to zoom.
+            <div class="mt-2">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="text-muted small">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Interactive weather map powered by OpenWeatherMap. Click and drag to pan, scroll to zoom.
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div id="weatherMapLegend" class="text-end small">
+                            <span class="badge bg-info">Temperature Layer Active</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         `;
         
@@ -1056,25 +1074,34 @@ document.addEventListener('DOMContentLoaded', function() {
             
             baseLayer.addTo(map);
             
+            // Get initial layer from dropdown (default: temperature)
+            const initialLayer = document.getElementById('mapLayerSelect')?.value || 'temp_new';
+            
             // Add OpenWeatherMap weather layer with correct URL format
-            const weatherLayerUrl = `https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${apiKey}`;
+            const weatherLayerUrl = `https://tile.openweathermap.org/map/${initialLayer}/{z}/{x}/{y}.png?appid=${apiKey}`;
             console.log('Weather layer URL:', weatherLayerUrl);
             
             const weatherLayer = L.tileLayer(weatherLayerUrl, {
                 maxZoom: 18,
                 attribution: 'Weather data &copy; OpenWeatherMap',
-                transparent: true
+                transparent: true,
+                opacity: 0.6
             });
             
             weatherLayer.on('tileerror', function(error) {
                 console.error('Weather layer tile error:', error);
+                console.log('Failed URL:', error.tile.src);
+            });
+            
+            weatherLayer.on('tileload', function() {
+                console.log('Weather layer tiles loaded successfully');
             });
             
             weatherLayer.addTo(map);
             
             // Add marker for the location
             L.marker([lat, lon]).addTo(map)
-                .bindPopup('Selected Location')
+                .bindPopup(`<strong>Selected Location</strong><br>Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`)
                 .openPopup();
             
             // Store map reference for layer updates
@@ -1093,12 +1120,80 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update weather map layer
     window.updateWeatherMapLayer = function() {
-        if (window.currentWeatherLayer && window.weatherMapApiKey) {
+        if (window.currentWeatherLayer && window.weatherMapApiKey && window.currentWeatherMap) {
             const layerSelect = document.getElementById('mapLayerSelect');
             const selectedLayer = layerSelect.value;
             
-            // Update layer URL with new layer type using correct URL format
-            window.currentWeatherLayer.setUrl(`https://tile.openweathermap.org/map/${selectedLayer}/{z}/{x}/{y}.png?appid=${window.weatherMapApiKey}`);
+            console.log('Updating weather map layer to:', selectedLayer);
+            
+            // Remove current weather layer
+            window.currentWeatherMap.removeLayer(window.currentWeatherLayer);
+            
+            // Create new weather layer with selected type
+            const newWeatherLayerUrl = `https://tile.openweathermap.org/map/${selectedLayer}/{z}/{x}/{y}.png?appid=${window.weatherMapApiKey}`;
+            console.log('New weather layer URL:', newWeatherLayerUrl);
+            
+            const newWeatherLayer = L.tileLayer(newWeatherLayerUrl, {
+                maxZoom: 18,
+                attribution: 'Weather data &copy; OpenWeatherMap',
+                transparent: true,
+                opacity: 0.6
+            });
+            
+            newWeatherLayer.on('tileerror', function(error) {
+                console.error('New weather layer tile error:', error);
+                console.log('Failed URL:', error.tile.src);
+            });
+            
+            newWeatherLayer.on('tileload', function() {
+                console.log('New weather layer tiles loaded successfully');
+            });
+            
+            // Add new layer to map
+            newWeatherLayer.addTo(window.currentWeatherMap);
+            
+            // Update reference
+            window.currentWeatherLayer = newWeatherLayer;
+            
+            // Show layer info
+            const layerNames = {
+                'temp_new': 'Temperature',
+                'precipitation_new': 'Precipitation',
+                'wind_new': 'Wind Speed',
+                'pressure_new': 'Pressure',
+                'clouds_new': 'Cloud Coverage'
+            };
+            
+            console.log(`Weather map layer changed to: ${layerNames[selectedLayer] || selectedLayer}`);
+            
+            // Update legend
+            const legend = document.getElementById('weatherMapLegend');
+            if (legend) {
+                const badgeColors = {
+                    'temp_new': 'bg-danger',
+                    'precipitation_new': 'bg-primary',
+                    'wind_new': 'bg-success',
+                    'pressure_new': 'bg-warning',
+                    'clouds_new': 'bg-secondary'
+                };
+                legend.innerHTML = `<span class="badge ${badgeColors[selectedLayer] || 'bg-info'}">${layerNames[selectedLayer] || selectedLayer} Layer Active</span>`;
+            }
+        } else {
+            console.error('Cannot update weather layer - missing references:', {
+                layer: !!window.currentWeatherLayer,
+                apiKey: !!window.weatherMapApiKey,
+                map: !!window.currentWeatherMap
+            });
+        }
+    };
+
+    // Update weather map opacity
+    window.updateWeatherMapOpacity = function() {
+        if (window.currentWeatherLayer) {
+            const opacitySlider = document.getElementById('opacitySlider');
+            const opacity = parseFloat(opacitySlider.value);
+            window.currentWeatherLayer.setOpacity(opacity);
+            console.log('Weather layer opacity updated to:', opacity);
         }
     };
 
