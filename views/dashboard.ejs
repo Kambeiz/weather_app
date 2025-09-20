@@ -6,20 +6,13 @@
             </div>
             <div class="card-body">
                 <form id="addCityForm">
-                    <div class="mb-3">
-                        <label for="countrySelect" class="form-label">Country (Optional)</label>
-                        <select class="form-select" id="countrySelect">
-                            <option value="">All Countries</option>
-                            <!-- Countries will be populated by JavaScript -->
-                        </select>
-                    </div>
                     <div class="mb-3 location-selector">
                         <label for="locationInput" class="form-label">Search Location</label>
                         <input type="text" class="form-control" id="locationInput" 
-                               placeholder="Enter city, region, or country (e.g., Paris, London, New York)" 
+                               placeholder="Enter city, region, or country (e.g., Paris, London, France, Germany)" 
                                required autocomplete="off">
                         <div class="location-suggestions" id="locationSuggestions" style="display: none;"></div>
-                        <div class="form-text">Search for any city, region, or country worldwide</div>
+                        <div class="form-text">Search for cities, regions, or countries. You can search by country name directly.</div>
                         <input type="hidden" id="selectedLat">
                         <input type="hidden" id="selectedLon">
                         <input type="hidden" id="selectedName">
@@ -54,12 +47,12 @@
 
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">Saved Cities</h5>
+                <h5 class="card-title mb-0">Saved Locations</h5>
             </div>
             <div class="card-body p-0">
                 <div class="list-group list-group-flush" id="savedCitiesList">
                     <div class="list-group-item text-center text-muted" id="noCitiesMessage">
-                        No cities saved yet. Add a city to get started!
+                        No Locations saved yet. Add a location to get started!
                     </div>
                 </div>
             </div>
@@ -137,17 +130,6 @@
         </div>
         <div class="card-body">
             <div id="historicalContent"></div>
-        </div>
-    </div>
-</div>
-
-<div id="weatherMapSection" style="display: none;" class="mt-3">
-    <div class="card">
-        <div class="card-header">
-            <h5 class="card-title mb-0">Weather Map</h5>
-        </div>
-        <div class="card-body">
-            <div id="weatherMapContent"></div>
         </div>
     </div>
 </div>

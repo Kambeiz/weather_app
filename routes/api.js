@@ -208,8 +208,11 @@ router.get('/weather-map-key', (req, res) => {
   try {
     const apiKey = process.env.OPENWEATHER_API_KEY;
     
+    console.log('Weather map API key request - Key exists:', !!apiKey);
+    
     if (!apiKey) {
-      return res.status(500).json({ message: 'Weather map service not configured' });
+      console.error('OpenWeather API key not found in environment variables');
+      return res.status(500).json({ message: 'Weather map service not configured - API key missing' });
     }
     
     res.json({ apiKey });

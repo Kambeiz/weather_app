@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function init() {
         loadSavedCities();
         setupEventListeners();
-        initializeCountrySelector();
+        initializeLocationSelector();
     }
 
     // Set up event listeners
@@ -73,30 +73,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Initialize location selector with autocomplete
-    function initializeCountrySelector() {
+    function initializeLocationSelector() {
         if (!locationInput) return;
-        
-        // Initialize country dropdown if available
-        const countrySelect = document.getElementById('countrySelect');
-        if (countrySelect && typeof countries !== 'undefined') {
-            // Clear existing options
-            countrySelect.innerHTML = '<option value="">All Countries</option>';
-            
-            // Add countries from the countries.js file
-            countries.forEach(country => {
-                const option = document.createElement('option');
-                option.value = country.code;
-                option.textContent = country.name;
-                countrySelect.appendChild(option);
-            });
-            
-            // Add event listener for country selection
-            countrySelect.addEventListener('change', function() {
-                selectedCountry = this.value;
-                // Clear location input when country changes
-                locationInput.value = '';
-            });
-        }
 
         let searchTimeout;
         
@@ -134,13 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Search for locations using geocoding API
     async function searchLocations(query) {
         try {
-            // Add country filter if selected
-            let apiUrl = `/api/geocode?q=${encodeURIComponent(query)}`;
-            if (selectedCountry) {
-                apiUrl += `&country=${selectedCountry}`;
-            }
-            
-            const response = await fetch(apiUrl);
+            const response = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
             
             if (!response.ok) {
                 throw new Error('Failed to search locations');
@@ -527,6 +499,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     </button>
                 </div>
                 <div id="historicalContent"></div>
+            </div>
+            <div id="weatherMapSection" style="display: none;" class="mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5><i class="fas fa-map me-2"></i>Weather Map</h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="hideAllWeatherSections()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="weatherMapContent"></div>
             </div>
         `;
         
@@ -958,23 +939,54 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load weather map
     window.loadWeatherMap = async function(lat, lon) {
         try {
+            // Always show the weather map section first
             const mapSection = document.getElementById('weatherMapSection');
             const mapContent = document.getElementById('weatherMapContent');
             
-            mapContent.innerHTML = `<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-info"></div><span class="ms-2">Loading weather map...</span></div>`;
+            if (!mapSection || !mapContent) {
+                console.error('Weather map elements not found');
+                return;
+            }
+            
+            // Make sure the section is visible
             mapSection.style.display = 'block';
+            
+            // Show loading spinner
+            mapContent.innerHTML = `<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-info"></div><span class="ms-2">Loading weather map...</span></div>`;
             
             // Get API key for weather map
             const response = await fetch(`/api/weather-map-key`);
-            if (!response.ok) throw new Error('Failed to get weather map API key');
+            console.log('Weather map API response status:', response.status);
             
-            const { apiKey } = await response.json();
+            if (!response.ok) {
+                let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorMessage;
+                } catch (parseError) {
+                    console.error('Failed to parse error response:', parseError);
+                }
+                throw new Error(errorMessage);
+            }
+            
+            const data = await response.json();
+            console.log('Weather map API response data:', data);
+            
+            if (!data.apiKey) {
+                throw new Error('No API key received from server');
+            }
+            
+            // Store API key globally for layer updates
+            window.weatherMapApiKey = data.apiKey;
             
             // Initialize weather map
-            initializeWeatherMap(lat, lon, apiKey);
+            initializeWeatherMap(lat, lon, data.apiKey);
         } catch (error) {
             console.error('Error loading weather map:', error);
-            document.getElementById('weatherMapContent').innerHTML = `<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>Weather map unavailable (OpenWeather API required)</div>`;
+            const mapContent = document.getElementById('weatherMapContent');
+            if (mapContent) {
+                mapContent.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Weather map error: ${error.message}</div>`;
+            }
         }
     };
 
@@ -984,23 +996,20 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Create map container
         mapContent.innerHTML = `
-            <div class="card">
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label">Weather Map Layer:</label>
-                        <select class="form-select" id="mapLayerSelect" onchange="updateWeatherMapLayer()">
-                            <option value="temp_new">Temperature</option>
-                            <option value="precipitation_new">Precipitation</option>
-                            <option value="wind_new">Wind Speed</option>
-                            <option value="pressure_new">Pressure</option>
-                        </select>
-                    </div>
-                    <div id="weatherMap" style="height: 400px; border-radius: 8px;"></div>
-                    <div class="mt-2 text-muted small">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Interactive weather map powered by OpenWeatherMap. Click and drag to pan, scroll to zoom.
-                    </div>
-                </div>
+            <div class="mb-3">
+                <label class="form-label">Weather Map Layer:</label>
+                <select class="form-select" id="mapLayerSelect" onchange="updateWeatherMapLayer()">
+                    <option value="temp_new">Temperature</option>
+                    <option value="precipitation_new">Precipitation</option>
+                    <option value="wind_new">Wind Speed</option>
+                    <option value="pressure_new">Pressure</option>
+                    <option value="clouds_new">Clouds</option>
+                </select>
+            </div>
+            <div id="weatherMap" style="height: 400px; border-radius: 8px; border: 1px solid #dee2e6;"></div>
+            <div class="mt-2 text-muted small">
+                <i class="fas fa-info-circle me-1"></i>
+                Interactive weather map powered by OpenWeatherMap. Click and drag to pan, scroll to zoom.
             </div>
         `;
         
@@ -1024,32 +1033,72 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Create weather map
     function createWeatherMap(lat, lon, apiKey) {
-        // Initialize map
-        const map = L.map('weatherMap').setView([lat, lon], 8);
-        
-        // Add OpenWeatherMap weather layer
-        const weatherLayer = L.tileLayer(`https://maps.openweathermap.org/maps/2.0/weather/{op}/{z}/{x}/{y}?appid=${apiKey}`, {
-            maxZoom: 18,
-            attribution: 'Weather data © OpenWeatherMap',
-            op: 'temp_new' // Default layer
-        }).addTo(map);
-        
-        // Store map reference for layer updates
-        window.currentWeatherMap = map;
-        window.currentWeatherLayer = weatherLayer;
+        try {
+            console.log('Creating weather map with:', { lat, lon, apiKey: apiKey ? 'present' : 'missing' });
+            
+            const mapContainer = document.getElementById('weatherMap');
+            if (!mapContainer) {
+                throw new Error('Weather map container not found');
+            }
+            
+            // Initialize map
+            const map = L.map('weatherMap').setView([lat, lon], 8);
+            
+            // Add OpenStreetMap base layer for better visibility
+            const baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            });
+            
+            baseLayer.on('tileerror', function(error) {
+                console.error('Base layer tile error:', error);
+            });
+            
+            baseLayer.addTo(map);
+            
+            // Add OpenWeatherMap weather layer with correct URL format
+            const weatherLayerUrl = `https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${apiKey}`;
+            console.log('Weather layer URL:', weatherLayerUrl);
+            
+            const weatherLayer = L.tileLayer(weatherLayerUrl, {
+                maxZoom: 18,
+                attribution: 'Weather data &copy; OpenWeatherMap',
+                transparent: true
+            });
+            
+            weatherLayer.on('tileerror', function(error) {
+                console.error('Weather layer tile error:', error);
+            });
+            
+            weatherLayer.addTo(map);
+            
+            // Add marker for the location
+            L.marker([lat, lon]).addTo(map)
+                .bindPopup('Selected Location')
+                .openPopup();
+            
+            // Store map reference for layer updates
+            window.currentWeatherMap = map;
+            window.currentWeatherLayer = weatherLayer;
+            
+            console.log('Weather map created successfully');
+        } catch (error) {
+            console.error('Error creating weather map:', error);
+            const mapContent = document.getElementById('weatherMapContent');
+            if (mapContent) {
+                mapContent.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Map creation error: ${error.message}</div>`;
+            }
+        }
     }
 
     // Update weather map layer
     window.updateWeatherMapLayer = function() {
-        if (window.currentWeatherLayer) {
+        if (window.currentWeatherLayer && window.weatherMapApiKey) {
             const layerSelect = document.getElementById('mapLayerSelect');
             const selectedLayer = layerSelect.value;
             
-            // Update layer URL with new operation
-            const currentUrl = window.currentWeatherLayer._url;
-            const newUrl = currentUrl.replace(/op=\w+/, `op=${selectedLayer}`);
-            
-            window.currentWeatherLayer.setUrl(newUrl);
+            // Update layer URL with new layer type using correct URL format
+            window.currentWeatherLayer.setUrl(`https://tile.openweathermap.org/map/${selectedLayer}/{z}/{x}/{y}.png?appid=${window.weatherMapApiKey}`);
         }
     };
 
