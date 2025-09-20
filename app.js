@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
+// const SQLiteStore = require('connect-sqlite3')(session); // Disabled for Vercel serverless
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const expressLayouts = require('express-ejs-layouts');
@@ -20,17 +20,16 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('layout', 'layout');
 
-// Session configuration with SQLite store for persistence
+// Session configuration - memory store for Vercel serverless
 app.use(session({
-  store: new SQLiteStore({
-    db: 'sessions.db',
-    dir: './database',
-    table: 'sessions'
-  }),
-  secret: process.env.SESSION_SECRET || 'your-secret-key', // In production, use environment variable
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 7 * 24 * 60 * 60 * 1000 } // 7 days
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production', 
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    httpOnly: true
+  }
 }));
 
 // Custom middleware to check if user is authenticated
