@@ -6,6 +6,16 @@
                 <% if (error) { %>
                     <div class="alert alert-danger"><%= error %></div>
                 <% } %>
+                <% if (typeof query !== 'undefined' && query.registered === 'true') { %>
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>Registration successful! Please login with your credentials.
+                    </div>
+                <% } %>
+                <% if (typeof query !== 'undefined' && query.reset === 'true') { %>
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>Password reset successful! Please login with your new password.
+                    </div>
+                <% } %>
                 <form action="/login" method="POST">
                     <div class="mb-3">
                         <label for="username" class="form-label">Username</label>
@@ -20,6 +30,7 @@
                     </div>
                 </form>
                 <div class="text-center mt-3">
+                    <p><a href="/forgot-password" class="text-muted">Forgot your password?</a></p>
                     <p>Don't have an account? <a href="/register">Register here</a></p>
                 </div>
             </div>

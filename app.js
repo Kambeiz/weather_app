@@ -6,7 +6,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const expressLayouts = require('express-ejs-layouts');
 // Switch to memory database for Vercel serverless compatibility
-const { createUser, findUserByUsername } = require('./database/memoryDb');
+const { createUser, findUserByUsername, findUserByEmail, createPasswordResetToken, validatePasswordResetToken, usePasswordResetToken, updateUserPassword, addFavoriteCity, removeFavoriteCity, getUserFavoriteCities } = require('./database/memoryDb');
 const apiRoutes = require('./routes/api');
 
 const app = express();
@@ -56,7 +56,8 @@ app.get('/login', (req, res) => {
   res.render('login', { 
     error: null,
     userId: null,
-    username: null
+    username: null,
+    query: req.query
   });
 });
 
@@ -109,8 +110,19 @@ app.get('/register', (req, res) => {
 
 app.post('/register', async (req, res) => {
   try {
-    console.log('Registration attempt:', req.body.username);
-    const { username, password, confirmPassword } = req.body;
+    console.log('Registration attempt:', req.body.username, 'email:', req.body.email);
+    const { username, email, password, confirmPassword } = req.body;
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      console.log('Invalid email format:', email);
+      return res.render('register', { 
+        error: 'Please enter a valid email address',
+        userId: null,
+        username: null
+      });
+    }
     
     if (password !== confirmPassword) {
       console.log('Password mismatch for user:', username);
@@ -140,10 +152,10 @@ app.post('/register', async (req, res) => {
       });
     }
     
-    console.log('Creating new user:', username);
-    const newUser = await createUser(username, password);
+    console.log('Creating new user:', username, 'with email:', email);
+    const newUser = await createUser(username, password, email);
     console.log('User created successfully:', newUser);
-    res.redirect('/login');
+    res.redirect('/login?registered=true');
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).render('error', { 
@@ -163,6 +175,142 @@ app.get('/dashboard', requireAuth, (req, res) => {
 
 // API Routes
 app.use('/api', apiRoutes);
+
+// Forgot Password Routes
+app.get('/forgot-password', (req, res) => {
+  res.render('forgot-password', { 
+    error: null,
+    success: null,
+    userId: null,
+    username: null
+  });
+});
+
+app.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      return res.render('forgot-password', { 
+        error: 'Please enter a valid email address',
+        success: null,
+        userId: null,
+        username: null
+      });
+    }
+    
+    const user = await findUserByEmail(email);
+    if (!user) {
+      // For security, don't reveal if email exists or not
+      return res.render('forgot-password', { 
+        error: null,
+        success: 'If an account with that email exists, we\'ve sent password reset instructions.',
+        userId: null,
+        username: null
+      });
+    }
+    
+    const resetToken = await createPasswordResetToken(email);
+    
+    // In a real app, you would send an email here
+    // For demo purposes, we'll show the reset link
+    console.log(`Password reset link: http://localhost:3000/reset-password?token=${resetToken}`);
+    
+    res.render('forgot-password', { 
+      error: null,
+      success: `Password reset instructions sent! For demo purposes, check the console for the reset link.`,
+      userId: null,
+      username: null
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.render('forgot-password', { 
+      error: 'An error occurred. Please try again.',
+      success: null,
+      userId: null,
+      username: null
+    });
+  }
+});
+
+app.get('/reset-password', async (req, res) => {
+  try {
+    const { token } = req.query;
+    
+    if (!token) {
+      return res.redirect('/forgot-password');
+    }
+    
+    const resetToken = await validatePasswordResetToken(token);
+    if (!resetToken) {
+      return res.render('forgot-password', { 
+        error: 'Invalid or expired reset token. Please request a new password reset.',
+        success: null,
+        userId: null,
+        username: null
+      });
+    }
+    
+    res.render('reset-password', { 
+      error: null,
+      token: token,
+      userId: null,
+      username: null
+    });
+  } catch (error) {
+    console.error('Reset password page error:', error);
+    res.redirect('/forgot-password');
+  }
+});
+
+app.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password, confirmPassword } = req.body;
+    
+    if (password !== confirmPassword) {
+      return res.render('reset-password', { 
+        error: 'Passwords do not match',
+        token: token,
+        userId: null,
+        username: null
+      });
+    }
+    
+    if (password.length < 6) {
+      return res.render('reset-password', { 
+        error: 'Password must be at least 6 characters long',
+        token: token,
+        userId: null,
+        username: null
+      });
+    }
+    
+    const resetToken = await validatePasswordResetToken(token);
+    if (!resetToken) {
+      return res.render('forgot-password', { 
+        error: 'Invalid or expired reset token. Please request a new password reset.',
+        success: null,
+        userId: null,
+        username: null
+      });
+    }
+    
+    await updateUserPassword(resetToken.email, password);
+    await usePasswordResetToken(token);
+    
+    res.redirect('/login?reset=true');
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.render('reset-password', { 
+      error: 'An error occurred. Please try again.',
+      token: req.body.token,
+      userId: null,
+      username: null
+    });
+  }
+});
 
 app.post('/logout', (req, res) => {
   req.session.destroy(err => {

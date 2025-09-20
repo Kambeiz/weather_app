@@ -3,12 +3,13 @@ const bcrypt = require('bcryptjs');
 // In-memory database for Vercel serverless compatibility
 let users = [];
 let favoriteCities = [];
+let passwordResetTokens = [];
 let nextUserId = 1;
 let nextCityId = 1;
 
 // User operations
-const createUser = async (username, password) => {
-  console.log('MemoryDB: Creating user:', username);
+const createUser = async (username, password, email = null) => {
+  console.log('MemoryDB: Creating user:', username, 'with email:', email);
   console.log('MemoryDB: Current users count:', users.length);
   
   // Check if user already exists
@@ -18,10 +19,20 @@ const createUser = async (username, password) => {
     throw new Error('Username already exists');
   }
 
+  // Check if email already exists
+  if (email) {
+    const existingEmail = users.find(u => u.email === email);
+    if (existingEmail) {
+      console.log('MemoryDB: Email already exists:', email);
+      throw new Error('Email already exists');
+    }
+  }
+
   const hashedPassword = await bcrypt.hash(password, 10);
   const user = {
     id: nextUserId++,
     username,
+    email,
     password: hashedPassword,
     created_at: new Date().toISOString()
   };
@@ -29,7 +40,7 @@ const createUser = async (username, password) => {
   users.push(user);
   console.log('MemoryDB: User created successfully:', user.id, username);
   console.log('MemoryDB: Total users now:', users.length);
-  return { id: user.id, username: user.username };
+  return { id: user.id, username: user.username, email: user.email };
 };
 
 const findUserByUsername = async (username) => {
@@ -38,6 +49,62 @@ const findUserByUsername = async (username) => {
   const user = users.find(u => u.username === username);
   console.log('MemoryDB: User found:', !!user);
   return user;
+};
+
+const findUserByEmail = async (email) => {
+  console.log('MemoryDB: Finding user by email:', email);
+  const user = users.find(u => u.email === email);
+  console.log('MemoryDB: User found by email:', !!user);
+  return user;
+};
+
+// Password reset token operations
+const createPasswordResetToken = async (email) => {
+  const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
+  
+  // Remove any existing tokens for this email
+  passwordResetTokens = passwordResetTokens.filter(t => t.email !== email);
+  
+  const resetToken = {
+    token,
+    email,
+    expiresAt,
+    used: false
+  };
+  
+  passwordResetTokens.push(resetToken);
+  console.log('MemoryDB: Password reset token created for:', email);
+  return token;
+};
+
+const validatePasswordResetToken = async (token) => {
+  const resetToken = passwordResetTokens.find(t => 
+    t.token === token && !t.used && new Date() < new Date(t.expiresAt)
+  );
+  
+  console.log('MemoryDB: Token validation result:', !!resetToken);
+  return resetToken;
+};
+
+const usePasswordResetToken = async (token) => {
+  const resetToken = passwordResetTokens.find(t => t.token === token);
+  if (resetToken) {
+    resetToken.used = true;
+    console.log('MemoryDB: Password reset token used:', token);
+    return true;
+  }
+  return false;
+};
+
+const updateUserPassword = async (email, newPassword) => {
+  const user = users.find(u => u.email === email);
+  if (user) {
+    user.password = await bcrypt.hash(newPassword, 10);
+    console.log('MemoryDB: Password updated for user:', email);
+    return true;
+  }
+  return false;
 };
 
 // Favorite cities operations
@@ -106,6 +173,11 @@ const run = async (sql, params = []) => {
 module.exports = {
   createUser,
   findUserByUsername,
+  findUserByEmail,
+  createPasswordResetToken,
+  validatePasswordResetToken,
+  usePasswordResetToken,
+  updateUserPassword,
   addFavoriteCity,
   removeFavoriteCity,
   getUserFavoriteCities,
