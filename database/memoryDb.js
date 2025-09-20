@@ -8,9 +8,13 @@ let nextCityId = 1;
 
 // User operations
 const createUser = async (username, password) => {
+  console.log('MemoryDB: Creating user:', username);
+  console.log('MemoryDB: Current users count:', users.length);
+  
   // Check if user already exists
   const existingUser = users.find(u => u.username === username);
   if (existingUser) {
+    console.log('MemoryDB: User already exists:', username);
     throw new Error('Username already exists');
   }
 
@@ -23,11 +27,17 @@ const createUser = async (username, password) => {
   };
   
   users.push(user);
+  console.log('MemoryDB: User created successfully:', user.id, username);
+  console.log('MemoryDB: Total users now:', users.length);
   return { id: user.id, username: user.username };
 };
 
 const findUserByUsername = async (username) => {
-  return users.find(u => u.username === username);
+  console.log('MemoryDB: Finding user:', username);
+  console.log('MemoryDB: Available users:', users.map(u => u.username));
+  const user = users.find(u => u.username === username);
+  console.log('MemoryDB: User found:', !!user);
+  return user;
 };
 
 // Favorite cities operations

@@ -109,9 +109,11 @@ app.get('/register', (req, res) => {
 
 app.post('/register', async (req, res) => {
   try {
+    console.log('Registration attempt:', req.body.username);
     const { username, password, confirmPassword } = req.body;
     
     if (password !== confirmPassword) {
+      console.log('Password mismatch for user:', username);
       return res.render('register', { 
         error: 'Passwords do not match',
         userId: null,
@@ -120,6 +122,7 @@ app.post('/register', async (req, res) => {
     }
     
     if (password.length < 6) {
+      console.log('Password too short for user:', username);
       return res.render('register', { 
         error: 'Password must be at least 6 characters long',
         userId: null,
@@ -129,6 +132,7 @@ app.post('/register', async (req, res) => {
     
     const existingUser = await findUserByUsername(username);
     if (existingUser) {
+      console.log('User already exists:', username);
       return res.render('register', { 
         error: 'Username already exists',
         userId: null,
@@ -136,12 +140,14 @@ app.post('/register', async (req, res) => {
       });
     }
     
-    await createUser(username, password);
+    console.log('Creating new user:', username);
+    const newUser = await createUser(username, password);
+    console.log('User created successfully:', newUser);
     res.redirect('/login');
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).render('error', { 
-      message: 'An error occurred during registration',
+      message: 'An error occurred during registration: ' + error.message,
       userId: null,
       username: null
     });
