@@ -1,5 +1,5 @@
 <div class="jumbotron text-center mb-5">
-    <h1 class="display-4">Welcome to Debbah Weather</h1>
+    <h1 class="display-4">Welcome to D Weather</h1>
     <p class="lead">Check weather instantly or save your favorite locations.</p>
 </div>
 
@@ -44,6 +44,13 @@
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="guestUnitToggle">
                         <label class="form-check-label" for="guestUnitToggle">°C / °F</label>
+                    </div>
+                    <div class="provider-selector">
+                        <select class="form-select form-select-sm" id="weatherProviderSelect">
+                            <option value="openweather" selected>OpenWeatherMap</option>
+                            <option value="weatherapi">WeatherAPI</option>
+                            <option value="openmeteo">Open-Meteo</option>
+                        </select>
                     </div>
                     <button class="btn btn-success btn-sm" id="saveLocationBtn" style="display: none;">
                         <i class="fas fa-heart me-1"></i>Save Location

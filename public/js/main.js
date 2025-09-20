@@ -8,11 +8,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const locationInput = document.getElementById('locationInput');
     const locationSuggestions = document.getElementById('locationSuggestions');
     const providerButtons = document.querySelectorAll('.provider-btn');
+    const weatherProviderSelect = document.getElementById('weatherProviderSelect');
     
     let currentUnit = 'metric'; // Default to Celsius
     let savedCities = [];
     let currentCityId = null;
-    let currentProvider = 'openweather'; // Default provider
+    let currentPreferredProvider = 'openweather'; // Default provider
     let selectedCountry = null;
 
     // Initialize the application
@@ -39,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.addEventListener('click', () => {
                 providerButtons.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                currentProvider = btn.dataset.provider;
+                currentPreferredProvider = btn.dataset.provider;
                 
                 // Refresh current city weather with new provider
                 if (currentCityId) {
@@ -47,11 +48,55 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
+
+        // Handle provider selection change
+        if (weatherProviderSelect) {
+            weatherProviderSelect.addEventListener('change', function() {
+                currentPreferredProvider = this.value;
+                
+                // If we have a location selected, update the weather
+                if (weatherContent.style.display !== 'none') {
+                    const lat = document.getElementById('selectedLat').value;
+                    const lon = document.getElementById('selectedLon').value;
+                    
+                    if (lat && lon) {
+                        getWeatherForLocation(lat, lon, currentUnit, currentPreferredProvider);
+                    }
+                }
+                
+                // If we have a city selected in the dashboard, update that too
+                if (currentCityId) {
+                    showWeatherForCity(currentCityId);
+                }
+            });
+        }
     }
 
     // Initialize location selector with autocomplete
     function initializeCountrySelector() {
         if (!locationInput) return;
+        
+        // Initialize country dropdown if available
+        const countrySelect = document.getElementById('countrySelect');
+        if (countrySelect && typeof countries !== 'undefined') {
+            // Clear existing options
+            countrySelect.innerHTML = '<option value="">All Countries</option>';
+            
+            // Add countries from the countries.js file
+            countries.forEach(country => {
+                const option = document.createElement('option');
+                option.value = country.code;
+                option.textContent = country.name;
+                countrySelect.appendChild(option);
+            });
+            
+            // Add event listener for country selection
+            countrySelect.addEventListener('change', function() {
+                selectedCountry = this.value;
+                // Clear location input when country changes
+                locationInput.value = '';
+            });
+        }
 
         let searchTimeout;
         
@@ -89,7 +134,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Search for locations using geocoding API
     async function searchLocations(query) {
         try {
-            const response = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
+            // Add country filter if selected
+            let apiUrl = `/api/geocode?q=${encodeURIComponent(query)}`;
+            if (selectedCountry) {
+                apiUrl += `&country=${selectedCountry}`;
+            }
+            
+            const response = await fetch(apiUrl);
             
             if (!response.ok) {
                 throw new Error('Failed to search locations');
@@ -309,7 +360,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Get weather data
-            const weatherData = await getWeatherData(city.lat, city.lon, currentUnit);
+            const weatherData = await getWeatherData(city.lat, city.lon, currentUnit, currentPreferredProvider);
             
             // Update current city ID
             currentCityId = cityId;
@@ -324,9 +375,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Get weather data from the selected provider
-    async function getWeatherData(lat, lon, units = 'metric') {
+    async function getWeatherData(lat, lon, units = 'metric', preferredProvider = 'openweather') {
         try {
-            const response = await fetch(`/api/weather?lat=${lat}&lon=${lon}&units=${units}&provider=${currentProvider}`);
+            const response = await fetch(`/api/weather?lat=${lat}&lon=${lon}&units=${units}&provider=${preferredProvider}`);
             
             if (!response.ok) {
                 const error = await response.json();
@@ -709,7 +760,7 @@ document.addEventListener('DOMContentLoaded', function() {
             forecastSection.style.display = 'block';
             
             // Get forecast data
-            const response = await fetch(`/api/forecast?lat=${lat}&lon=${lon}&units=${currentUnit}&provider=${currentProvider}`);
+            const response = await fetch(`/api/forecast?lat=${lat}&lon=${lon}&units=${currentUnit}&provider=${currentPreferredProvider}`);
             if (!response.ok) {
                 throw new Error('Failed to fetch forecast data');
             }
@@ -737,11 +788,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const dailyForecasts = [];
         const processedDays = new Set();
         
+        // Set max days based on provider
+        const maxDays = currentPreferredProvider === 'openmeteo' ? 7 : 5;
+        
         forecastData.list.forEach(item => {
             const date = new Date(item.dt * 1000);
             const dayKey = date.toDateString();
             
-            if (!processedDays.has(dayKey) && dailyForecasts.length < 5) {
+            if (!processedDays.has(dayKey) && dailyForecasts.length < maxDays) {
                 // Prefer forecasts around noon (12:00)
                 const hour = date.getHours();
                 if (hour >= 11 && hour <= 13) {
@@ -809,6 +863,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button class="btn btn-outline-success btn-sm" onclick="toggleWeatherSection('airPollution', ${lat}, ${lon})">
                     <i class="fas fa-leaf me-1"></i>Air Quality
                 </button>
+                <button class="btn btn-outline-info btn-sm" onclick="toggleWeatherSection('weatherMap', ${lat}, ${lon})">
+                    <i class="fas fa-map me-1"></i>Weather Map
+                </button>
             `;
         } else if (provider === 'WeatherAPI') {
             // WeatherAPI features
@@ -824,6 +881,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 </button>
                 <button class="btn btn-outline-secondary btn-sm" onclick="toggleWeatherSection('historical', ${lat}, ${lon})">
                     <i class="fas fa-history me-1"></i>Historical (7 days)
+                </button>
+            `;
+        } else if (provider === 'Open-Meteo') {
+            // Open-Meteo features
+            buttons = `
+                <button class="btn btn-outline-primary btn-sm" onclick="toggleWeatherSection('forecast', ${lat}, ${lon})">
+                    <i class="fas fa-calendar-alt me-1"></i>7-Day Forecast
+                </button>
+                <button class="btn btn-outline-warning btn-sm" onclick="toggleWeatherSection('marine', ${lat}, ${lon})">
+                    <i class="fas fa-anchor me-1"></i>Marine Weather
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="toggleWeatherSection('historical', ${lat}, ${lon})">
+                    <i class="fas fa-history me-1"></i>Historical Weather
                 </button>
             `;
         } else {
@@ -847,7 +917,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Toggle weather sections (hide others, show selected)
     window.toggleWeatherSection = function(sectionType, lat, lon) {
         // Hide all sections first
-        const sections = ['forecastSection', 'airPollutionSection', 'astronomySection', 'marineSection', 'historicalSection'];
+        const sections = ['forecastSection', 'airPollutionSection', 'astronomySection', 'marineSection', 'historicalSection', 'weatherMapSection'];
         sections.forEach(sectionId => {
             const section = document.getElementById(sectionId);
             if (section) section.style.display = 'none';
@@ -870,16 +940,117 @@ document.addEventListener('DOMContentLoaded', function() {
             case 'historical':
                 showHistoricalOptions(lat, lon);
                 break;
+            case 'weatherMap':
+                loadWeatherMap(lat, lon);
+                break;
         }
     };
 
     // Hide all weather sections
     window.hideAllWeatherSections = function() {
-        const sections = ['forecastSection', 'airPollutionSection', 'astronomySection', 'marineSection', 'historicalSection'];
+        const sections = ['forecastSection', 'airPollutionSection', 'astronomySection', 'marineSection', 'historicalSection', 'weatherMapSection'];
         sections.forEach(sectionId => {
             const section = document.getElementById(sectionId);
             if (section) section.style.display = 'none';
         });
+    };
+
+    // Load weather map
+    window.loadWeatherMap = async function(lat, lon) {
+        try {
+            const mapSection = document.getElementById('weatherMapSection');
+            const mapContent = document.getElementById('weatherMapContent');
+            
+            mapContent.innerHTML = `<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-info"></div><span class="ms-2">Loading weather map...</span></div>`;
+            mapSection.style.display = 'block';
+            
+            // Get API key for weather map
+            const response = await fetch(`/api/weather-map-key`);
+            if (!response.ok) throw new Error('Failed to get weather map API key');
+            
+            const { apiKey } = await response.json();
+            
+            // Initialize weather map
+            initializeWeatherMap(lat, lon, apiKey);
+        } catch (error) {
+            console.error('Error loading weather map:', error);
+            document.getElementById('weatherMapContent').innerHTML = `<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>Weather map unavailable (OpenWeather API required)</div>`;
+        }
+    };
+
+    // Initialize weather map
+    function initializeWeatherMap(lat, lon, apiKey) {
+        const mapContent = document.getElementById('weatherMapContent');
+        
+        // Create map container
+        mapContent.innerHTML = `
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Weather Map Layer:</label>
+                        <select class="form-select" id="mapLayerSelect" onchange="updateWeatherMapLayer()">
+                            <option value="temp_new">Temperature</option>
+                            <option value="precipitation_new">Precipitation</option>
+                            <option value="wind_new">Wind Speed</option>
+                            <option value="pressure_new">Pressure</option>
+                        </select>
+                    </div>
+                    <div id="weatherMap" style="height: 400px; border-radius: 8px;"></div>
+                    <div class="mt-2 text-muted small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Interactive weather map powered by OpenWeatherMap. Click and drag to pan, scroll to zoom.
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Load Leaflet library
+        if (typeof L === 'undefined') {
+            const leafletScript = document.createElement('script');
+            leafletScript.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            leafletScript.onload = () => {
+                const leafletCSS = document.createElement('link');
+                leafletCSS.rel = 'stylesheet';
+                leafletCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+                document.head.appendChild(leafletCSS);
+                
+                setTimeout(() => createWeatherMap(lat, lon, apiKey), 100);
+            };
+            document.head.appendChild(leafletScript);
+        } else {
+            createWeatherMap(lat, lon, apiKey);
+        }
+    }
+
+    // Create weather map
+    function createWeatherMap(lat, lon, apiKey) {
+        // Initialize map
+        const map = L.map('weatherMap').setView([lat, lon], 8);
+        
+        // Add OpenWeatherMap weather layer
+        const weatherLayer = L.tileLayer(`https://maps.openweathermap.org/maps/2.0/weather/{op}/{z}/{x}/{y}?appid=${apiKey}`, {
+            maxZoom: 18,
+            attribution: 'Weather data © OpenWeatherMap',
+            op: 'temp_new' // Default layer
+        }).addTo(map);
+        
+        // Store map reference for layer updates
+        window.currentWeatherMap = map;
+        window.currentWeatherLayer = weatherLayer;
+    }
+
+    // Update weather map layer
+    window.updateWeatherMapLayer = function() {
+        if (window.currentWeatherLayer) {
+            const layerSelect = document.getElementById('mapLayerSelect');
+            const selectedLayer = layerSelect.value;
+            
+            // Update layer URL with new operation
+            const currentUrl = window.currentWeatherLayer._url;
+            const newUrl = currentUrl.replace(/op=\w+/, `op=${selectedLayer}`);
+            
+            window.currentWeatherLayer.setUrl(newUrl);
+        }
     };
 
     // Load air pollution data

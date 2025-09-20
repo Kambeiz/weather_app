@@ -1,7 +1,7 @@
 {
   "name": "weather-app",
   "version": "1.0.0",
-  "description": "A weather application that allows users to save favorite cities and check the weather",
+  "description": "D Weather - A weather application that allows users to save favorite cities and check the weather",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",

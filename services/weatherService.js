@@ -31,14 +31,18 @@ async function getWeatherData(lat, lon, units = 'metric') {
 
 /**
  * Get coordinates for a city name
- * @param {string} query - City name and optional country code (e.g., "London,GB")
+ * @param {string} query - City name
+ * @param {string} country - Optional country code for filtering
  * @returns {Promise<Array>} Array of location data
  */
-async function getCityCoordinates(query) {
+async function getCityCoordinates(query, country = null) {
   try {
+    // Build query with country filter if provided
+    const searchQuery = country ? `${query},${country}` : query;
+    
     const response = await axios.get(`${OPENWEATHER_BASE_URL}/geo/1.0/direct`, {
       params: {
-        q: query,
+        q: searchQuery,
         limit: 5,
         appid: OPENWEATHER_API_KEY,
       },

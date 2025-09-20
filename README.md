@@ -1,6 +1,6 @@
-# Weather App
+# D Weather
 
-A web application that allows users to save their favorite cities and check the weather. Built with Node.js, Express, SQLite, and OpenWeatherMap API.
+A web application that allows users to save their favorite cities and check the weather. Built with Node.js, Express, SQLite, and multiple weather APIs including OpenWeatherMap, WeatherAPI, and Open-Meteo.
 
 ## Features
 

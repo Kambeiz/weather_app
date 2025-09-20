@@ -44,13 +44,14 @@ router.get('/weather', async (req, res) => {
 // Search for city coordinates (public endpoint - no auth required)
 router.get('/geocode', async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q, country } = req.query;
     
     if (!q) {
       return res.status(400).json({ message: 'Search query is required' });
     }
     
-    const results = await getCityCoordinates(q);
+    // Pass country code if provided for filtering
+    const results = await getCityCoordinates(q, country);
     res.json(results);
   } catch (error) {
     console.error('Error geocoding city:', error);
@@ -137,16 +138,16 @@ router.get('/air-pollution', async (req, res) => {
   }
 });
 
-// Get marine weather data (WeatherAPI)
+// Get marine weather data (WeatherAPI or Open-Meteo)
 router.get('/marine', async (req, res) => {
   try {
-    const { lat, lon } = req.query;
+    const { lat, lon, provider = 'weatherapi' } = req.query;
     
     if (!lat || !lon) {
       return res.status(400).json({ message: 'Latitude and longitude are required' });
     }
     
-    const marineData = await getMarineWeatherData(lat, lon);
+    const marineData = await getMarineWeatherData(lat, lon, provider);
     res.json(marineData);
   } catch (error) {
     console.error('Error fetching marine weather data:', error);
@@ -154,10 +155,10 @@ router.get('/marine', async (req, res) => {
   }
 });
 
-// Get historical weather data (WeatherAPI - up to 7 days back)
+// Get historical weather data (WeatherAPI or Open-Meteo - up to 7 days back)
 router.get('/historical', async (req, res) => {
   try {
-    const { lat, lon, date } = req.query;
+    const { lat, lon, date, provider = 'weatherapi' } = req.query;
     
     if (!lat || !lon || !date) {
       return res.status(400).json({ message: 'Latitude, longitude, and date are required' });
@@ -174,7 +175,7 @@ router.get('/historical', async (req, res) => {
       });
     }
     
-    const historicalData = await getHistoricalWeatherData(lat, lon, date);
+    const historicalData = await getHistoricalWeatherData(lat, lon, date, provider);
     res.json(historicalData);
   } catch (error) {
     console.error('Error fetching historical weather data:', error);
@@ -199,6 +200,22 @@ router.get('/astronomy', async (req, res) => {
   } catch (error) {
     console.error('Error fetching astronomy data:', error);
     res.status(500).json({ message: 'Failed to fetch astronomy data' });
+  }
+});
+
+// Get OpenWeatherMap API key for weather maps (public endpoint)
+router.get('/weather-map-key', (req, res) => {
+  try {
+    const apiKey = process.env.OPENWEATHER_API_KEY;
+    
+    if (!apiKey) {
+      return res.status(500).json({ message: 'Weather map service not configured' });
+    }
+    
+    res.json({ apiKey });
+  } catch (error) {
+    console.error('Error getting weather map API key:', error);
+    res.status(500).json({ message: 'Failed to get weather map configuration' });
   }
 });
 
