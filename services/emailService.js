@@ -2,10 +2,10 @@
 const { Resend } = require('resend');
 const nodemailer = require('nodemailer');
 
-// Initialize Resend if API key is available
+// Initialize Resend if API key is available (for local development)
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
-// Send email using Resend
+// Send email using Resend (commented for production, available for local dev)
 const sendViaResend = async (emailContent) => {
   try {
     const { data, error } = await resend.emails.send({
@@ -29,19 +29,12 @@ const sendViaResend = async (emailContent) => {
 
 // Create email transporter
 const createTransporter = () => {
-  if (process.env.EMAIL_SERVICE === 'gmail') {
+  // Mailjet SMTP (Primary - French service)
+  if (process.env.EMAIL_HOST && process.env.EMAIL_HOST.includes('mailjet.com')) {
     return nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
-  } else if (process.env.EMAIL_SERVICE === 'outlook') {
-    return nodemailer.createTransport({
-      host: 'smtp.office365.com',
-      port: 587,
-      secure: false,
+      host: process.env.EMAIL_HOST,
+      port: parseInt(process.env.EMAIL_PORT) || 587,
+      secure: process.env.EMAIL_SECURE === 'true',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -49,9 +42,9 @@ const createTransporter = () => {
     });
   }
   
-  // Fallback to SMTP configuration
+  // Fallback to generic SMTP configuration
   return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    host: process.env.EMAIL_HOST || 'in-v3.mailjet.com',
     port: process.env.EMAIL_PORT || 587,
     secure: process.env.EMAIL_SECURE === 'true',
     auth: {
@@ -69,30 +62,96 @@ const sendPasswordResetEmail = async (email, resetToken) => {
   const emailContent = {
     from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
     to: email,
-    subject: 'D Weather - Password Reset Request',
+    subject: 'Reset your D Weather password',
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); padding: 20px; text-align: center;">
-          <h1 style="color: white; margin: 0;">D Weather</h1>
-        </div>
-        <div style="padding: 30px; background: #f8f9fa;">
-          <h2 style="color: #2c5aa0;">Password Reset Request</h2>
-          <p>Hello,</p>
-          <p>You requested a password reset for your D Weather account. Click the button below to reset your password:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${resetUrl}" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: bold;">Reset Password</a>
-          </div>
-          <p>Or copy and paste this link into your browser:</p>
-          <p style="word-break: break-all; background: #e9ecef; padding: 10px; border-radius: 5px; font-family: monospace;">${resetUrl}</p>
-          <p><strong>This link will expire in 1 hour.</strong></p>
-          <p>If you didn't request this password reset, please ignore this email.</p>
-          <hr style="margin: 30px 0; border: none; border-top: 1px solid #dee2e6;">
-          <p style="color: #6c757d; font-size: 14px;">
-            Best regards,<br>
-            The D Weather Team
-          </p>
-        </div>
-      </div>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Reset your D Weather password</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4;">
+        <table role="presentation" style="width: 100%; border-collapse: collapse; border: 0;">
+          <tr>
+            <td style="padding: 20px;">
+              <table role="presentation" style="width: 100%; max-width: 600px; margin: 0 auto; border-collapse: collapse; border: 0;">
+                <!-- Header -->
+                <tr>
+                  <td style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1 style="color: white; margin: 0; font-size: 28px;">D Weather</h1>
+                    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Your Weather Companion</p>
+                  </td>
+                </tr>
+                
+                <!-- Content -->
+                <tr>
+                  <td style="background: white; padding: 40px; border-radius: 0 0 8px 8px;">
+                    <h2 style="color: #2c5aa0; margin: 0 0 20px 0; font-size: 24px;">Reset Your Password</h2>
+                    
+                    <p style="color: #333; margin: 0 0 20px 0; font-size: 16px; line-height: 1.5;">
+                      Hello,
+                    </p>
+                    
+                    <p style="color: #333; margin: 0 0 30px 0; font-size: 16px; line-height: 1.5;">
+                      We received a request to reset the password for your D Weather account. 
+                      Click the button below to create a new password:
+                    </p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                      <a href="${resetUrl}" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; padding: 15px 35px; text-decoration: none; border-radius: 30px; display: inline-block; font-weight: bold; font-size: 16px;">
+                        Reset Password
+                      </a>
+                    </div>
+                    
+                    <p style="color: #666; margin: 30px 0 15px 0; font-size: 14px; line-height: 1.5;">
+                      Or copy and paste this link into your browser:
+                    </p>
+                    
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 0 0 30px 0;">
+                      <p style="margin: 0; font-family: monospace; font-size: 12px; word-break: break-all; color: #495057;">
+                        ${resetUrl}
+                      </p>
+                    </div>
+                    
+                    <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 0 0 30px 0;">
+                      <p style="margin: 0; color: #856404; font-size: 14px; font-weight: bold;">
+                        ⏰ This link will expire in 1 hour.
+                      </p>
+                    </div>
+                    
+                    <p style="color: #666; margin: 0 0 30px 0; font-size: 14px; line-height: 1.5;">
+                      If you didn't request this password reset, please ignore this email. 
+                      Your account remains secure.
+                    </p>
+                    
+                    <hr style="border: none; border-top: 1px solid #e9ecef; margin: 30px 0;">
+                    
+                    <p style="color: #6c757d; margin: 0; font-size: 14px; line-height: 1.5;">
+                      Best regards,<br>
+                      <strong>The D Weather Team</strong>
+                    </p>
+                  </td>
+                </tr>
+                
+                <!-- Footer -->
+                <tr>
+                  <td style="padding: 20px; text-align: center; color: #6c757d; font-size: 12px;">
+                    <p style="margin: 0;">
+                      &copy; 2024 D Weather. All rights reserved.
+                    </p>
+                    <p style="margin: 10px 0 0 0;">
+                      This email was sent to ${email}. If you believe this was sent in error, 
+                      please contact our support team.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `,
     text: `
 D Weather - Password Reset Request
@@ -113,34 +172,9 @@ The D Weather Team
   };
 
   try {
-    // Try Resend first if API key is available
-    if (resend && process.env.RESEND_API_KEY) {
-      return await sendViaResend(emailContent);
-    }
-    
-    // Check if email configuration is available
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.log('Email configuration not found. Logging email content for demo purposes:');
-      console.log('=== PASSWORD RESET EMAIL ===');
-      console.log('To:', emailContent.to);
-      console.log('Subject:', emailContent.subject);
-      console.log('Reset URL:', resetUrl);
-      console.log('========================');
-      
-      return {
-        success: true,
-        message: 'Password reset email logged (demo mode - no email sent)',
-        resetUrl: resetUrl,
-        demo: true
-      };
-    }
-
-    // Create transporter and send email
     const transporter = createTransporter();
     await transporter.sendMail(emailContent);
-
     console.log('Password reset email sent successfully to:', email);
-    
     return {
       success: true,
       message: 'Password reset email sent successfully',
@@ -201,23 +235,6 @@ const sendWelcomeEmail = async (email, username) => {
   };
 
   try {
-    // Try Resend first if API key is available
-    if (resend && process.env.RESEND_API_KEY) {
-      await sendViaResend(emailContent);
-      console.log('Welcome email sent successfully via Resend to:', email);
-      return;
-    }
-    
-    // Check if email configuration is available
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.log('Email configuration not found. Logging welcome email for demo purposes:');
-      console.log('=== WELCOME EMAIL ===');
-      console.log('To:', emailContent.to);
-      console.log('Subject:', emailContent.subject);
-      console.log('==================');
-      return;
-    }
-
     const transporter = createTransporter();
     await transporter.sendMail(emailContent);
     console.log('Welcome email sent successfully to:', email);
@@ -231,11 +248,6 @@ const sendWelcomeEmail = async (email, username) => {
     console.log('Error:', error.message);
     console.log('===============================');
   }  
-    return {
-      success: false,
-      message: 'Failed to send welcome email',
-      error: error.message
-    };
 };
 
 module.exports = {
