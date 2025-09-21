@@ -5,9 +5,15 @@ const session = require('express-session');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const expressLayouts = require('express-ejs-layouts');
-// Use MySQL for production, fallback to memory for development
+const { createMySQLSessionStore } = require('./database/mysqlSessionStore');
+
 console.log('DB_PASSWORD exists:', !!process.env.DB_PASSWORD);
 console.log('NODE_ENV:', process.env.NODE_ENV);
+
+if (process.env.NODE_ENV === 'production' && !process.env.DB_PASSWORD) {
+  throw new Error('DB_PASSWORD is required in production. Memory database is not allowed.');
+}
+
 const dbModule = process.env.DB_PASSWORD ? './database/mysqlDb' : './database/memoryDb';
 console.log('Using database module:', dbModule);
 const { createUser, findUserByUsername, findUserByEmail, createPasswordResetToken, validatePasswordResetToken, usePasswordResetToken, updateUserPassword, addFavoriteCity, removeFavoriteCity, getUserFavoriteCities } = require(dbModule);
@@ -39,7 +45,7 @@ app.use(session({
     sameSite: 'lax'
   },
   // Add session store configuration for production
-  store: process.env.NODE_ENV === 'production' ? undefined : undefined // Will use MemoryStore but suppress warning
+  store: process.env.NODE_ENV === 'production' ? createMySQLSessionStore() : undefined // Will use MemoryStore but suppress warning
 }));
 
 // Custom middleware to check if user is authenticated
