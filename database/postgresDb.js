@@ -27,9 +27,12 @@ const initializePostgres = () => {
     const projectId = supabaseUrl.hostname.split('.')[0];
     
     // Construct PostgreSQL connection string from Supabase variables
-    const connectionString = `postgresql://postgres.${projectId}:${process.env.SUPABASE_DB_PASSWORD || 'Ordinateur93*'}@aws-1-eu-west-3.pooler.supabase.com:6543/postgres`;
+    // For Supabase connection pooler, username format is: postgres.projectId
+    const connectionString = `postgresql://postgres.${projectId}:${process.env.POSTGRES_PASSWORD || 'Ordinateur93*'}@aws-1-eu-west-3.pooler.supabase.com:6543/postgres`;
     
     console.log('Connecting to PostgreSQL via Supabase URL');
+    console.log('Project ID:', projectId);
+    console.log('Connection string (password hidden):', connectionString.replace(/:[^:]*@/, ':***@'));
     pool = new Pool({
       connectionString: connectionString,
       ssl: { rejectUnauthorized: false }
