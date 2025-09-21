@@ -1,12 +1,17 @@
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
 
 // Database connection pool
 let pool;
 
 const initializeMySQL = async () => {
   try {
-    // Create connection pool
+    // Read SSL certificate for Aiven
+    const sslCA = fs.readFileSync(path.join(__dirname, 'ca-certificate.pem'));
+    
+    // Create connection pool with timeout and retry settings
     pool = mysql.createPool({
       host: process.env.DB_HOST || 'localhost',
       user: process.env.DB_USER || 'root',
@@ -16,9 +21,12 @@ const initializeMySQL = async () => {
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
+      acquireTimeout: 60000,
+      timeout: 60000,
+      reconnect: true,
       ssl: process.env.NODE_ENV === 'production' ? { 
-        rejectUnauthorized: false,
-        require: true 
+        ca: sslCA,
+        rejectUnauthorized: true
       } : false
     });
 
