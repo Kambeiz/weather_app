@@ -6,7 +6,10 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const expressLayouts = require('express-ejs-layouts');
 // Use MySQL for production, fallback to memory for development
+console.log('DB_PASSWORD exists:', !!process.env.DB_PASSWORD);
+console.log('NODE_ENV:', process.env.NODE_ENV);
 const dbModule = process.env.DB_PASSWORD ? './database/mysqlDb' : './database/memoryDb';
+console.log('Using database module:', dbModule);
 const { createUser, findUserByUsername, findUserByEmail, createPasswordResetToken, validatePasswordResetToken, usePasswordResetToken, updateUserPassword, addFavoriteCity, removeFavoriteCity, getUserFavoriteCities } = require(dbModule);
 const { sendPasswordResetEmail, sendWelcomeEmail } = require('./services/emailService');
 const apiRoutes = require('./routes/api');

@@ -21,9 +21,6 @@ const initializeMySQL = async () => {
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
-      acquireTimeout: 60000,
-      timeout: 60000,
-      reconnect: true,
       ssl: process.env.NODE_ENV === 'production' ? { 
         ca: sslCA,
         rejectUnauthorized: true
@@ -43,11 +40,24 @@ async function initializeDatabase() {
   try {
     console.log('Initializing MySQL database...');
     
-    // Test connection
-    const connection = await pool.getConnection();
-    await connection.ping();
-    connection.release();
-    console.log('MySQL connection test successful');
+    // Test connection with retry logic
+    let retries = 3;
+    let connection;
+    
+    while (retries > 0) {
+      try {
+        connection = await pool.getConnection();
+        await connection.ping();
+        connection.release();
+        console.log('MySQL connection test successful');
+        break;
+      } catch (error) {
+        retries--;
+        console.log(`Connection attempt failed, retries left: ${retries}`);
+        if (retries === 0) throw error;
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+      }
+    }
     
     // Create users table
     await pool.execute(`
@@ -91,6 +101,7 @@ async function initializeDatabase() {
     console.log('MySQL database initialized successfully');
   } catch (error) {
     console.error('Error initializing MySQL database:', error);
+    console.log('Falling back to memory database for this session');
     throw error;
   }
 }
@@ -120,12 +131,15 @@ async function run(sql, params = []) {
 // User management functions
 async function createUser(username, email, hashedPassword) {
   try {
+    console.log('MySQL createUser called with:', { username, email });
     const result = await run(
       'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
       [username, email, hashedPassword]
     );
+    console.log('MySQL user created successfully:', result.insertId);
     return { id: result.insertId, username, email };
   } catch (error) {
+    console.error('MySQL createUser error:', error);
     if (error.code === 'ER_DUP_ENTRY') {
       throw new Error('Username or email already exists');
     }
