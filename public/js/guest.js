@@ -685,18 +685,18 @@ document.addEventListener('DOMContentLoaded', function() {
     function createGuestWeatherSection(sectionId, title, iconClass) {
         const section = document.createElement('div');
         section.id = sectionId;
-        section.className = 'mt-4';
+        section.className = 'mt-4 d-flex justify-content-center';
         section.style.display = 'none';
         
         section.innerHTML = `
-            <div class="card shadow">
+            <div class="card shadow" style="width: 100%; max-width: 100%;">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="${iconClass} me-2"></i>${title}</h5>
                     <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('${sectionId}').style.display='none'">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
-                <div class="card-body">
+                <div class="card-body text-center">
                     <div class="section-content"></div>
                 </div>
             </div>

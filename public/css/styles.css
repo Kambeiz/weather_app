@@ -554,6 +554,7 @@ footer {
     width: 100%;
     max-width: 100%;
     margin: 0 auto;
+    text-align: center;
 }
 
 #weatherMap {
@@ -563,6 +564,31 @@ footer {
     border-radius: 8px;
     margin: 0 auto;
     display: block;
+}
+
+/* Center all weather sections created by guest.js */
+#guestWeatherContent .card {
+    margin: 0 auto;
+}
+
+#guestWeatherContent .weather-map-container,
+#guestForecastSection,
+#guestAirPollutionSection,
+#guestMarineSection,
+#guestHistoricalSection,
+#guestAstronomySection,
+#guestWeatherMapSection {
+    margin: 0 auto;
+    text-align: center;
+}
+
+#guestWeatherContent .section-content {
+    text-align: center;
+}
+
+/* Ensure all dynamically created weather sections are centered */
+.mt-4 .card {
+    margin: 0 auto;
 }
 
 /* Guest Weather Section Centering */

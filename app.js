@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const expressLayouts = require('express-ejs-layouts');
 // Switch to memory database for Vercel serverless compatibility
 const { createUser, findUserByUsername, findUserByEmail, createPasswordResetToken, validatePasswordResetToken, usePasswordResetToken, updateUserPassword, addFavoriteCity, removeFavoriteCity, getUserFavoriteCities } = require('./database/memoryDb');
+const { sendPasswordResetEmail, sendWelcomeEmail } = require('./services/emailService');
 const apiRoutes = require('./routes/api');
 
 const app = express();
@@ -21,23 +22,30 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('layout', 'layout');
 
-// Session configuration - memory store for Vercel serverless
+// Session configuration - use secure settings for production
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
+  name: 'dweather.sid',
   cookie: { 
-    secure: process.env.NODE_ENV === 'production', 
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    httpOnly: true
-  }
+    secure: process.env.NODE_ENV === 'production' && process.env.VERCEL_URL ? true : false,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    httpOnly: true,
+    sameSite: 'lax'
+  },
+  // Add session store configuration for production
+  store: process.env.NODE_ENV === 'production' ? undefined : undefined // Will use MemoryStore but suppress warning
 }));
 
 // Custom middleware to check if user is authenticated
 const requireAuth = (req, res, next) => {
+  console.log('Auth check - Session ID:', req.sessionID, 'User ID:', req.session.userId);
   if (!req.session.userId) {
+    console.log('No user ID in session, redirecting to login');
     return res.redirect('/login');
   }
+  console.log('User authenticated:', req.session.username);
   next();
 };
 
@@ -63,30 +71,49 @@ app.get('/login', (req, res) => {
 
 app.post('/login', async (req, res) => {
   try {
+    console.log('Login attempt for:', req.body.username);
     const { username, password } = req.body;
     const user = await findUserByUsername(username);
     
     if (!user) {
+      console.log('User not found:', username);
       return res.render('login', { 
         error: 'Invalid username or password',
         userId: null,
-        username: null
+        username: null,
+        query: {}
       });
     }
     
     const isMatch = await bcrypt.compare(password, user.password);
     
     if (!isMatch) {
+      console.log('Password mismatch for user:', username);
       return res.render('login', { 
         error: 'Invalid username or password',
         userId: null,
-        username: null
+        username: null,
+        query: {}
       });
     }
     
+    // Set session data
     req.session.userId = user.id;
     req.session.username = user.username;
-    res.redirect('/dashboard');
+    
+    // Force session save before redirect
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).render('error', { 
+          message: 'Login failed - session error',
+          userId: null,
+          username: null
+        });
+      }
+      console.log('User logged in successfully:', username, 'Session ID:', req.sessionID);
+      res.redirect('/dashboard');
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).render('error', { 
@@ -155,6 +182,15 @@ app.post('/register', async (req, res) => {
     console.log('Creating new user:', username, 'with email:', email);
     const newUser = await createUser(username, password, email);
     console.log('User created successfully:', newUser);
+    
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(email, username);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail registration if email fails
+    }
+    
     res.redirect('/login?registered=true');
   } catch (error) {
     console.error('Registration error:', error);
@@ -214,16 +250,24 @@ app.post('/forgot-password', async (req, res) => {
     
     const resetToken = await createPasswordResetToken(email);
     
-    // In a real app, you would send an email here
-    // For demo purposes, we'll show the reset link
-    console.log(`Password reset link: http://localhost:3000/reset-password?token=${resetToken}`);
-    
-    res.render('forgot-password', { 
-      error: null,
-      success: `Password reset instructions sent! For demo purposes, check the console for the reset link.`,
-      userId: null,
-      username: null
-    });
+    // Send password reset email
+    try {
+      const emailResult = await sendPasswordResetEmail(email, resetToken);
+      res.render('forgot-password', { 
+        error: null,
+        success: `Password reset instructions sent to ${email}. Check your email and server logs for the reset link.`,
+        userId: null,
+        username: null
+      });
+    } catch (emailError) {
+      console.error('Failed to send password reset email:', emailError);
+      res.render('forgot-password', { 
+        error: null,
+        success: `Password reset instructions would be sent to ${email}. Check the server logs for the reset link.`,
+        userId: null,
+        username: null
+      });
+    }
   } catch (error) {
     console.error('Forgot password error:', error);
     res.render('forgot-password', { 
