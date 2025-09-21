@@ -6,7 +6,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const expressLayouts = require('express-ejs-layouts');
 // Use PostgreSQL for production, fallback to memory for development
-const dbModule = process.env.DATABASE_URL ? './database/postgresDb' : './database/memoryDb';
+const dbModule = (process.env.DATABASE_URL || process.env.SUPABASE_URL) ? './database/postgresDb' : './database/memoryDb';
 const { createUser, findUserByUsername, findUserByEmail, createPasswordResetToken, validatePasswordResetToken, usePasswordResetToken, updateUserPassword, addFavoriteCity, removeFavoriteCity, getUserFavoriteCities } = require(dbModule);
 const { sendPasswordResetEmail, sendWelcomeEmail } = require('./services/emailService');
 const apiRoutes = require('./routes/api');

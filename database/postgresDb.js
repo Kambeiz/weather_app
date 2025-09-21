@@ -7,9 +7,32 @@ let pool;
 const initializePostgres = () => {
   if (process.env.DATABASE_URL) {
     // Use connection string (Supabase or other PostgreSQL)
+    const dbUrl = process.env.DATABASE_URL.trim();
+    console.log('Raw DATABASE_URL length:', dbUrl.length);
+    console.log('DATABASE_URL starts with:', dbUrl.substring(0, 30));
+    console.log('DATABASE_URL ends with:', dbUrl.substring(dbUrl.length - 30));
+    
+    // Validate URL format
+    if (!dbUrl.startsWith('postgresql://')) {
+      throw new Error('Invalid DATABASE_URL format. Must start with postgresql://');
+    }
+    
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: dbUrl,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+  } else if (process.env.SUPABASE_URL) {
+    // Use Supabase environment variables to construct connection
+    const supabaseUrl = new URL(process.env.SUPABASE_URL);
+    const projectId = supabaseUrl.hostname.split('.')[0];
+    
+    // Construct PostgreSQL connection string from Supabase variables
+    const connectionString = `postgresql://postgres.${projectId}:${process.env.SUPABASE_DB_PASSWORD || 'Ordinateur93*'}@aws-1-eu-west-3.pooler.supabase.com:6543/postgres`;
+    
+    console.log('Connecting to PostgreSQL via Supabase URL');
+    pool = new Pool({
+      connectionString: connectionString,
+      ssl: { rejectUnauthorized: false }
     });
   } else {
     // Use individual connection parameters
@@ -29,6 +52,11 @@ const initializePostgres = () => {
 // Initialize database with tables
 async function initializeDatabase() {
   try {
+    console.log('Initializing PostgreSQL database...');
+    // Test connection first
+    await pool.query('SELECT NOW()');
+    console.log('PostgreSQL connection test successful');
+    
     // Create users table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -159,7 +187,7 @@ const getUserFavoriteCities = async (userId) => {
 };
 
 // Initialize the connection
-if (process.env.DATABASE_URL || process.env.DB_PASSWORD) {
+if (process.env.DATABASE_URL || process.env.DB_PASSWORD || process.env.SUPABASE_URL) {
   initializePostgres();
 }
 

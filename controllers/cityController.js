@@ -1,5 +1,5 @@
 // Use PostgreSQL for production, fallback to memory for development
-const dbModule = process.env.DATABASE_URL ? '../database/postgresDb' : '../database/memoryDb';
+const dbModule = (process.env.DATABASE_URL || process.env.SUPABASE_URL) ? '../database/postgresDb' : '../database/memoryDb';
 const { query, run, getUserFavoriteCities: getDbFavoriteCities, addFavoriteCity: addDbFavoriteCity, removeFavoriteCity: removeDbFavoriteCity } = require(dbModule);
 const { getWeatherData } = require('../services/weatherService');
 
