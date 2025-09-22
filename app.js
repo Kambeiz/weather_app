@@ -6,22 +6,21 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const { createMySQLSessionStore } = require('./database/mysqlSessionStore');
 
-// Initialize session store asynchronously
-let sessionStoreReady = false;
+// Initialize MySQL session store - REQUIRED for production
 let sessionStore = null;
 
 async function initializeSessionStore() {
   if (process.env.NODE_ENV === 'production') {
     try {
       sessionStore = await createMySQLSessionStore();
-      sessionStoreReady = true;
-      console.log('Session store initialized successfully');
+      if (!sessionStore) {
+        throw new Error('MySQL session store creation failed');
+      }
+      console.log('MySQL session store initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize session store:', error);
-      sessionStoreReady = true; // Continue with memory store
+      console.error('Failed to initialize MySQL session store:', error);
+      throw error; // Fail fast - no memory store fallback
     }
-  } else {
-    sessionStoreReady = true;
   }
 }
 
@@ -50,21 +49,29 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('layout', 'layout');
 
-// Configure session middleware immediately with fallback
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  name: 'dweather.sid',
-  cookie: { 
-    secure: false,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    httpOnly: true,
-    sameSite: 'lax'
-  },
-  // Start with memory store, will be replaced if MySQL store initializes
-  store: sessionStore || undefined
-}));
+// Session configuration - MySQL only, no memory store fallback
+async function configureSessionMiddleware() {
+  if (process.env.NODE_ENV === 'production') {
+    await initializeSessionStore();
+    if (!sessionStore) {
+      throw new Error('MySQL session store is required for production - no fallback allowed');
+    }
+  }
+  
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    name: 'dweather.sid',
+    cookie: { 
+      secure: false,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      httpOnly: true,
+      sameSite: 'lax'
+    },
+    store: sessionStore // MySQL only - no memory store fallback
+  }));
+}
 
 // Custom middleware to check if user is authenticated
 const requireAuth = (req, res, next) => {
@@ -519,20 +526,26 @@ app.use((req, res) => {
   res.status(404).render('error', { message: 'Page not found' });
 });
 
-// Initialize session store in background for production
-if (process.env.NODE_ENV === 'production') {
-  initializeSessionStore().then(() => {
-    console.log('Background session store initialization complete');
-  }).catch(error => {
-    console.error('Background session store initialization failed:', error);
-  });
+// Initialize app with MySQL session store requirement
+async function initializeApp() {
+  try {
+    // Configure session middleware with MySQL requirement
+    await configureSessionMiddleware();
+    console.log('App initialization complete with MySQL session store');
+    
+    // Start server locally
+    if (process.env.NODE_ENV !== 'production') {
+      app.listen(PORT, () => {
+        console.log(`Server is running on http://localhost:${PORT}`);
+      });
+    }
+  } catch (error) {
+    console.error('Failed to initialize app - MySQL session store required:', error);
+    process.exit(1); // Fail fast - no memory store fallback
+  }
 }
 
-// Start server locally
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-  });
-}
+// Initialize the app
+initializeApp();
 
 module.exports = app;
