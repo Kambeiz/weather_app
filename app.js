@@ -49,29 +49,53 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('layout', 'layout');
 
-// Session configuration - MySQL only, no memory store fallback
-async function configureSessionMiddleware() {
-  if (process.env.NODE_ENV === 'production') {
-    await initializeSessionStore();
-    if (!sessionStore) {
-      throw new Error('MySQL session store is required for production - no fallback allowed');
-    }
-  }
+// Initialize session store synchronously for serverless compatibility
+if (process.env.NODE_ENV === 'production') {
+  // Create MySQL session store immediately - block module loading until ready
+  const MySQLStore = require('express-mysql-session')(session);
+  const fs = require('fs');
   
-  app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
-    resave: false,
-    saveUninitialized: false,
-    name: 'dweather.sid',
-    cookie: { 
-      secure: false,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      httpOnly: true,
-      sameSite: 'lax'
+  const sslCA = fs.readFileSync(path.join(__dirname, 'database/ca-certificate.pem'));
+  
+  const options = {
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    ssl: { 
+      ca: sslCA,
+      rejectUnauthorized: true
     },
-    store: sessionStore // MySQL only - no memory store fallback
-  }));
+    createDatabaseTable: true,
+    schema: {
+      tableName: 'sessions',
+      columnNames: {
+        session_id: 'session_id',
+        expires: 'expires',
+        data: 'data'
+      }
+    }
+  };
+
+  sessionStore = new MySQLStore(options);
+  console.log('MySQL session store created synchronously');
 }
+
+// Configure session middleware immediately - no async dependency
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  name: 'dweather.sid',
+  cookie: { 
+    secure: false,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    httpOnly: true,
+    sameSite: 'lax'
+  },
+  store: sessionStore // MySQL store created synchronously above
+}));
 
 // Custom middleware to check if user is authenticated
 const requireAuth = (req, res, next) => {
@@ -526,26 +550,11 @@ app.use((req, res) => {
   res.status(404).render('error', { message: 'Page not found' });
 });
 
-// Initialize app with MySQL session store requirement
-async function initializeApp() {
-  try {
-    // Configure session middleware with MySQL requirement
-    await configureSessionMiddleware();
-    console.log('App initialization complete with MySQL session store');
-    
-    // Start server locally
-    if (process.env.NODE_ENV !== 'production') {
-      app.listen(PORT, () => {
-        console.log(`Server is running on http://localhost:${PORT}`);
-      });
-    }
-  } catch (error) {
-    console.error('Failed to initialize app - MySQL session store required:', error);
-    process.exit(1); // Fail fast - no memory store fallback
-  }
+// Start server locally (session middleware already configured above)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
 }
-
-// Initialize the app
-initializeApp();
 
 module.exports = app;
