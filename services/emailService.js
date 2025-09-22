@@ -123,7 +123,7 @@ const getVerifiedTransporter = async () => {
 
 const sendPasswordResetEmail = async (email, resetToken) => {
   // Try Mailjet HTTP API first (production), fallback to SMTP (local), then Resend
-  if (mailjetClient && process.env.NODE_ENV === 'production') {
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS && process.env.NODE_ENV === 'production') {
     console.log('Using Mailjet HTTP API for password reset email');
     const resetUrl = process.env.VERCEL_URL 
       ? `https://${process.env.VERCEL_URL}/reset-password?token=${resetToken}`
@@ -309,7 +309,7 @@ The D Weather Team
 
 const sendWelcomeEmail = async (email, username) => {
   // Try Mailjet HTTP API first (production), fallback to SMTP (local), then Resend
-  if (mailjetClient && process.env.NODE_ENV === 'production') {
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS && process.env.NODE_ENV === 'production') {
     console.log('Using Mailjet HTTP API for welcome email');
     const emailContent = {
       from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
