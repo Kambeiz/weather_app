@@ -70,10 +70,10 @@ function configureSession() {
 
 // Custom middleware to check if user is authenticated
 const requireAuth = (req, res, next) => {
-  console.log('Auth check - Session ID:', req.sessionID, 'User ID:', req.session.userId);
+  console.log('Auth check - Session ID:', req.sessionID, 'User ID:', req.session?.userId);
   console.log('Cookie secure setting:', req.app.get('env') === 'production' ? 'true' : 'false');
   console.log('Request protocol:', req.protocol, 'Headers:', req.get('x-forwarded-proto'));
-  if (!req.session.userId) {
+  if (!req.session?.userId) {
     console.log('No user ID in session, redirecting to login');
     return res.redirect('/login');
   }
@@ -84,13 +84,13 @@ const requireAuth = (req, res, next) => {
 // Routes
 app.get('/', (req, res) => {
   res.render('index', { 
-    userId: req.session.userId || null,
-    username: req.session.username || null
+    userId: req.session?.userId || null,
+    username: req.session?.username || null
   });
 });
 
 app.get('/login', (req, res) => {
-  if (req.session.userId) {
+  if (req.session?.userId) {
     return res.redirect('/dashboard');
   }
   const successMessage = req.query.registered === 'true' ? 
@@ -134,20 +134,29 @@ app.post('/login', async (req, res) => {
     }
     
     // Log in the user
-    req.session.userId = user.id;
-    req.session.username = user.username;
-    
-    // Force session save before redirect
-    req.session.save((err) => {
-      if (err) {
-        console.error('Session save error:', err);
-      } else {
-        console.log('Session saved successfully');
-      }
-      console.log('User logged in successfully:', username, 'Session ID:', req.sessionID);
-      console.log('Session data after login:', JSON.stringify(req.session, null, 2));
-      res.redirect('/dashboard');
-    });
+    if (req.session) {
+      req.session.userId = user.id;
+      req.session.username = user.username;
+      
+      // Force session save before redirect
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+        } else {
+          console.log('Session saved successfully');
+        }
+        console.log('User logged in successfully:', username, 'Session ID:', req.sessionID);
+        console.log('Session data after login:', JSON.stringify(req.session, null, 2));
+        res.redirect('/dashboard');
+      });
+    } else {
+      console.error('Session not available during login');
+      res.status(500).render('error', { 
+        message: 'Session error during login',
+        userId: null,
+        username: null
+      });
+    }
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).render('error', { 
@@ -159,7 +168,7 @@ app.post('/login', async (req, res) => {
 });
 
 app.get('/register', (req, res) => {
-  if (req.session.userId) {
+  if (req.session?.userId) {
     return res.redirect('/dashboard');
   }
   res.render('register', { 
@@ -412,13 +421,17 @@ app.post('/reset-password', async (req, res) => {
 });
 
 app.post('/logout', (req, res) => {
-  req.session.destroy(err => {
-    if (err) {
-      console.error('Error destroying session:', err);
-      return res.status(500).send('Error logging out');
-    }
+  if (req.session) {
+    req.session.destroy(err => {
+      if (err) {
+        console.error('Error destroying session:', err);
+        return res.status(500).send('Error logging out');
+      }
+      res.redirect('/');
+    });
+  } else {
     res.redirect('/');
-  });
+  }
 });
 
 // Error handling middleware
