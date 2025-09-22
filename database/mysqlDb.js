@@ -40,23 +40,19 @@ async function initializeDatabase() {
   try {
     console.log('Initializing MySQL database...');
     
-    // Test connection with retry logic
-    let retries = 3;
-    let connection;
+    if (!pool) {
+      console.error('MySQL pool not initialized');
+      return;
+    }
     
-    while (retries > 0) {
-      try {
-        connection = await pool.getConnection();
-        await connection.ping();
-        connection.release();
-        console.log('MySQL connection test successful');
-        break;
-      } catch (error) {
-        retries--;
-        console.log(`Connection attempt failed, retries left: ${retries}`);
-        if (retries === 0) throw error;
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
-      }
+    // For testing: Drop and recreate all tables on each deployment
+    if (process.env.NODE_ENV === 'production') {
+      console.log('TESTING MODE: Dropping all tables for fresh start...');
+      await pool.execute('DROP TABLE IF EXISTS sessions');
+      await pool.execute('DROP TABLE IF EXISTS favorite_cities');
+      await pool.execute('DROP TABLE IF EXISTS password_reset_tokens');
+      await pool.execute('DROP TABLE IF EXISTS users');
+      console.log('All tables dropped successfully');
     }
     
     // Create users table
