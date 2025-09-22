@@ -94,6 +94,16 @@ async function initializeDatabase() {
       )
     `);
 
+    // Create sessions table for express-mysql-session
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        session_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
+        expires INT(11) UNSIGNED NOT NULL,
+        data MEDIUMTEXT COLLATE utf8mb4_bin,
+        PRIMARY KEY (session_id)
+      )
+    `);
+
     console.log('MySQL database initialized successfully');
   } catch (error) {
     console.error('Error initializing MySQL database:', error);
