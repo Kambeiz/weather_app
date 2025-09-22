@@ -26,18 +26,8 @@ const createMySQLSessionStore = async () => {
       } : false
     });
 
-    // Create sessions table if it doesn't exist
-    await connection.execute(`
-      CREATE TABLE IF NOT EXISTS sessions (
-        session_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
-        expires INT(11) UNSIGNED NOT NULL,
-        data MEDIUMTEXT COLLATE utf8mb4_bin,
-        PRIMARY KEY (session_id)
-      )
-    `);
-    
     await connection.end();
-    console.log('Sessions table ensured to exist');
+    console.log('Session store connection verified');
     
     const options = {
       host: process.env.DB_HOST,
@@ -49,7 +39,7 @@ const createMySQLSessionStore = async () => {
         ca: sslCA,
         rejectUnauthorized: true
       } : false,
-      createDatabaseTable: false, // Table already exists
+      createDatabaseTable: true, // Let express-mysql-session create the table
       schema: {
         tableName: 'sessions',
         columnNames: {

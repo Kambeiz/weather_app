@@ -68,40 +68,25 @@ async function initializeMySQL() {
 // Initialize database with tables
 async function initializeDatabase() {
   try {
-    console.log('Initializing MySQL database...');
-    
-    if (!pool) {
-      console.error('MySQL pool not initialized');
-      return;
-    }
-    
-    // For testing: Drop and recreate all tables on each deployment
-    if (process.env.NODE_ENV === 'production') {
-      console.log('TESTING MODE: Dropping all tables for fresh start...');
-      await pool.execute('DROP TABLE IF EXISTS sessions');
-      await pool.execute('DROP TABLE IF EXISTS favorite_cities');
-      await pool.execute('DROP TABLE IF EXISTS password_reset_tokens');
-      await pool.execute('DROP TABLE IF EXISTS users');
-      console.log('All tables dropped successfully');
-    }
-    
+    console.log('Initializing database tables...');
+
     // Create users table
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         username VARCHAR(255) UNIQUE NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Create password_reset_tokens table
+    // Create password reset tokens table
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS password_reset_tokens (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
-        token VARCHAR(255) UNIQUE NOT NULL,
+        token VARCHAR(255) NOT NULL,
         expires_at TIMESTAMP NOT NULL,
         used BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -109,18 +94,18 @@ async function initializeDatabase() {
       )
     `);
 
-    // Create favorite_cities table
+    // Create favorite cities table
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS favorite_cities (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
         city_name VARCHAR(255) NOT NULL,
-        country VARCHAR(255),
-        lat DECIMAL(10, 8),
-        lon DECIMAL(11, 8),
+        country VARCHAR(255) NOT NULL,
+        lat DECIMAL(10, 8) NOT NULL,
+        lon DECIMAL(11, 8) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY unique_user_city (user_id, city_name),
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_user_city (user_id, city_name, country)
       )
     `);
 
@@ -134,10 +119,9 @@ async function initializeDatabase() {
       )
     `);
 
-    console.log('MySQL database initialized successfully');
+    console.log('Database tables initialized successfully');
   } catch (error) {
-    console.error('Error initializing MySQL database:', error);
-    console.log('Falling back to memory database for this session');
+    console.error('Error initializing database:', error);
     throw error;
   }
 }
