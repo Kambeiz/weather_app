@@ -89,7 +89,7 @@ app.use(session({
   saveUninitialized: false,
   name: 'dweather.sid',
   cookie: { 
-    secure: false,
+    secure: process.env.NODE_ENV === 'production',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
     sameSite: 'lax'
@@ -100,18 +100,28 @@ app.use(session({
 // Custom middleware to check if user is authenticated
 const requireAuth = (req, res, next) => {
   console.log('Auth check - Session ID:', req.sessionID, 'User ID:', req.session?.userId);
+  console.log('Session data:', JSON.stringify(req.session, null, 2));
   console.log('Cookie secure setting:', req.app.get('env') === 'production' ? 'true' : 'false');
   console.log('Request protocol:', req.protocol, 'Headers:', req.get('x-forwarded-proto'));
-  if (!req.session?.userId) {
-    console.log('No user ID in session, redirecting to login');
-    return res.redirect('/login');
-  }
-  console.log('User authenticated:', req.session.username);
-  next();
+  
+  // Force session reload from store to ensure fresh data
+  req.session.reload((err) => {
+    if (err) {
+      console.error('Session reload error:', err);
+      return res.redirect('/login');
+    }
+    
+    console.log('Session after reload:', JSON.stringify(req.session, null, 2));
+    if (!req.session?.userId) {
+      return res.redirect('/login');
+    }
+    next();
+  });
 };
 
 // Routes
 app.get('/', (req, res) => {
+  console.log('Home page - Session ID:', req.sessionID, 'User ID:', req.session?.userId);
   res.render('index', { 
     userId: req.session?.userId || null,
     username: req.session?.username || null
@@ -147,6 +157,12 @@ app.post('/login', async (req, res) => {
     
     const { username, password } = req.body;
     console.log('Login attempt for username:', username);
+    
+    // Check if user is already logged in
+    if (req.session?.userId) {
+      console.log('User already logged in, redirecting to dashboard');
+      return res.redirect('/dashboard');
+    }
     
     // Database lookup
     console.log('Looking up user in database...');
