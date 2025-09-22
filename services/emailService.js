@@ -1,41 +1,46 @@
 // Email service for password reset functionality
 const { Resend } = require('resend');
 const nodemailer = require('nodemailer');
-const mailjet = require('node-mailjet');
 
 // Initialize Resend if API key is available (for local development)
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
-// Initialize Mailjet HTTP API client
-const mailjetClient = process.env.EMAIL_USER && process.env.EMAIL_PASS 
-  ? mailjet.connect(process.env.EMAIL_USER, process.env.EMAIL_PASS)
-  : null;
-
 // Send email using Mailjet HTTP API (primary for production)
 const sendViaMailjet = async (emailContent) => {
-  if (!mailjetClient) {
-    throw new Error('Mailjet client not initialized');
-  }
-
+  // Use fetch to call Mailjet API directly
+  const auth = Buffer.from(`${process.env.EMAIL_USER}:${process.env.EMAIL_PASS}`).toString('base64');
+  
   try {
-    const request = mailjetClient.post('send', { version: 'v3.1' }).request({
-      Messages: [{
-        From: {
-          Email: emailContent.from,
-          Name: 'D Weather'
-        },
-        To: [{
-          Email: emailContent.to
-        }],
-        Subject: emailContent.subject,
-        HTMLPart: emailContent.html,
-        TextPart: emailContent.text || emailContent.subject
-      }]
+    const response = await fetch('https://api.mailjet.com/v3.1/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        Messages: [{
+          From: {
+            Email: emailContent.from,
+            Name: 'D Weather'
+          },
+          To: [{
+            Email: emailContent.to
+          }],
+          Subject: emailContent.subject,
+          HTMLPart: emailContent.html,
+          TextPart: emailContent.text || emailContent.subject
+        }]
+      })
     });
 
-    const result = await request;
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`Mailjet API error: ${response.status} - ${errorData}`);
+    }
+
+    const result = await response.json();
     console.log('Email sent successfully via Mailjet to:', emailContent.to);
-    return { success: true, message: 'Email sent successfully via Mailjet' };
+    return { success: true, message: 'Email sent successfully via Mailjet', result };
   } catch (error) {
     console.error('Mailjet HTTP API error:', error);
     throw error;
