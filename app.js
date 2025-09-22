@@ -142,6 +142,17 @@ app.post('/login', async (req, res) => {
       req.session.save((err) => {
         if (err) {
           console.error('Session save error:', err);
+          console.error('Session save error details:', {
+            code: err.code,
+            message: err.message,
+            stack: err.stack
+          });
+          return res.status(500).render('login', { 
+            error: 'Login failed due to session error. Please try again.',
+            userId: null,
+            username: null,
+            query: req.query
+          });
         } else {
           console.log('Session saved successfully');
         }
@@ -151,10 +162,13 @@ app.post('/login', async (req, res) => {
       });
     } else {
       console.error('Session not available during login');
-      res.status(500).render('error', { 
-        message: 'Session error during login',
+      console.error('Session object:', req.session);
+      console.error('Session ID:', req.sessionID);
+      res.status(500).render('login', { 
+        error: 'Session initialization failed. Please try again.',
         userId: null,
-        username: null
+        username: null,
+        query: req.query
       });
     }
   } catch (error) {
@@ -405,7 +419,22 @@ app.post('/reset-password', async (req, res) => {
       });
     }
     
-    await updateUserPassword(resetToken.email, password);
+    // Hash the new password
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Find user by email to get userId
+    const user = await findUserByEmail(resetToken.email);
+    if (!user) {
+      return res.render('forgot-password', { 
+        error: 'User not found. Please request a new password reset.',
+        success: null,
+        userId: null,
+        username: null
+      });
+    }
+    
+    await updateUserPassword(user.id, hashedPassword);
     await usePasswordResetToken(token);
     
     res.redirect('/login?reset=true');
