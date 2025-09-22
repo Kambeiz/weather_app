@@ -64,50 +64,56 @@ async function initializeMySQL() {
 
 // Initialize database with tables
 async function initializeDatabase() {
+  console.log('Initializing database tables...');
+  
   try {
-    console.log('Initializing database tables...');
+    // Drop all tables first for fresh start
+    await run('DROP TABLE IF EXISTS favorite_cities');
+    await run('DROP TABLE IF EXISTS password_reset_tokens');
+    await run('DROP TABLE IF EXISTS users');
+    await run('DROP TABLE IF EXISTS sessions');
+    console.log('All tables dropped for fresh database reset');
 
     // Create users table
-    await pool.execute(`
+    await run(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(255) UNIQUE NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        email VARCHAR(100) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Create password reset tokens table
-    await pool.execute(`
+    // Create password_reset_tokens table
+    await run(`
       CREATE TABLE IF NOT EXISTS password_reset_tokens (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
+        email VARCHAR(100) NOT NULL,
         token VARCHAR(255) NOT NULL,
         expires_at TIMESTAMP NOT NULL,
         used BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Create favorite cities table
-    await pool.execute(`
+    // Create favorite_cities table
+    await run(`
       CREATE TABLE IF NOT EXISTS favorite_cities (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
-        city_name VARCHAR(255) NOT NULL,
-        country VARCHAR(255) NOT NULL,
-        lat DECIMAL(10, 8) NOT NULL,
-        lon DECIMAL(11, 8) NOT NULL,
+        city_name VARCHAR(100) NOT NULL,
+        country VARCHAR(100),
+        latitude DECIMAL(10, 8),
+        longitude DECIMAL(11, 8),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        UNIQUE KEY unique_user_city (user_id, city_name, country)
+        UNIQUE KEY unique_user_city (user_id, city_name)
       )
     `);
 
     // Create sessions table for express-mysql-session
-    await pool.execute(`
+    await run(`
       CREATE TABLE IF NOT EXISTS sessions (
         session_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
         expires INT(11) UNSIGNED NOT NULL,
@@ -116,7 +122,7 @@ async function initializeDatabase() {
       )
     `);
 
-    console.log('Database tables initialized successfully');
+    console.log('Database tables initialized successfully with fresh reset');
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;
@@ -170,6 +176,11 @@ async function findUserByUsername(username) {
 }
 
 async function findUserByEmail(email) {
+  console.log('findUserByEmail called with email:', email, 'type:', typeof email);
+  if (!email || email === undefined || email === null) {
+    console.error('findUserByEmail: email parameter is undefined/null');
+    return null;
+  }
   const users = await query('SELECT * FROM users WHERE email = ?', [email]);
   return users[0] || null;
 }

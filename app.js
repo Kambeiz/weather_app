@@ -500,6 +500,7 @@ app.post('/reset-password', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     
     // Find user by email to get userId
+    console.log('Looking up user by email for password reset:', resetToken.email);
     const user = await findUserByEmail(resetToken.email);
     if (!user) {
       return res.render('forgot-password', { 
