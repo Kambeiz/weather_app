@@ -1,18 +1,36 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
-// const SQLiteStore = require('connect-sqlite3')(session); // Disabled for Vercel serverless
-const path = require('path');
-const bcrypt = require('bcryptjs');
 const expressLayouts = require('express-ejs-layouts');
+const bcrypt = require('bcryptjs');
+const path = require('path');
 const { createMySQLSessionStore } = require('./database/mysqlSessionStore');
 
-console.log('DB_PASSWORD exists:', !!process.env.DB_PASSWORD);
-console.log('NODE_ENV:', process.env.NODE_ENV);
+// Initialize session store asynchronously
+let sessionStoreReady = false;
+let sessionStore = null;
+
+async function initializeSessionStore() {
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      sessionStore = await createMySQLSessionStore();
+      sessionStoreReady = true;
+      console.log('Session store initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize session store:', error);
+      sessionStoreReady = true; // Continue with memory store
+    }
+  } else {
+    sessionStoreReady = true;
+  }
+}
 
 if (process.env.NODE_ENV === 'production' && !process.env.DB_PASSWORD) {
   throw new Error('DB_PASSWORD is required in production. Memory database is not allowed.');
 }
+
+console.log('DB_PASSWORD exists:', !!process.env.DB_PASSWORD);
+console.log('NODE_ENV:', process.env.NODE_ENV);
 
 const dbModule = process.env.DB_PASSWORD ? './database/mysqlDb' : './database/memoryDb';
 console.log('Using database module:', dbModule);
@@ -32,21 +50,23 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('layout', 'layout');
 
-// Session configuration - use secure settings for production
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  name: 'dweather.sid',
-  cookie: { 
-    secure: false,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    httpOnly: true,
-    sameSite: 'lax'
-  },
-  // Add session store configuration for production
-  store: process.env.NODE_ENV === 'production' ? createMySQLSessionStore() : undefined
-}));
+// Session configuration function to be called after store initialization
+function configureSession() {
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    name: 'dweather.sid',
+    cookie: { 
+      secure: false,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      httpOnly: true,
+      sameSite: 'lax'
+    },
+    // Use the initialized session store
+    store: sessionStore
+  }));
+}
 
 // Custom middleware to check if user is authenticated
 const requireAuth = (req, res, next) => {
@@ -412,11 +432,30 @@ app.use((req, res) => {
   res.status(404).render('error', { message: 'Page not found' });
 });
 
-// Start server locally, export for Vercel serverless
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-  });
+// Initialize app asynchronously
+async function initializeApp() {
+  try {
+    // Initialize session store first
+    await initializeSessionStore();
+    
+    // Configure session middleware after store is ready
+    configureSession();
+    
+    console.log('App initialization complete');
+    
+    // Start server locally
+    if (process.env.NODE_ENV !== 'production') {
+      app.listen(PORT, () => {
+        console.log(`Server is running on http://localhost:${PORT}`);
+      });
+    }
+  } catch (error) {
+    console.error('Failed to initialize app:', error);
+    process.exit(1);
+  }
 }
+
+// Initialize the app
+initializeApp();
 
 module.exports = app;
