@@ -147,8 +147,10 @@ app.get('/register', (req, res) => {
 
 app.post('/register', async (req, res) => {
   try {
-    console.log('Registration attempt:', req.body.username, 'email:', req.body.email);
     const { username, email, password, confirmPassword } = req.body;
+    console.log('Registration attempt:', { username, email });
+    console.log('Request body keys:', Object.keys(req.body));
+    console.log('Password provided:', !!password);
     
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -221,8 +223,15 @@ app.post('/register', async (req, res) => {
     res.redirect('/dashboard');
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).render('error', { 
-      message: 'An error occurred during registration: ' + error.message,
+    console.error('Registration error stack:', error.stack);
+    console.error('Registration error details:', {
+      code: error.code,
+      errno: error.errno,
+      sqlMessage: error.sqlMessage,
+      sqlState: error.sqlState
+    });
+    res.status(500).render('register', { 
+      error: 'Something went wrong during registration. Please try again.',
       userId: null,
       username: null
     });
