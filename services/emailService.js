@@ -1,11 +1,48 @@
 // Email service for password reset functionality
 const { Resend } = require('resend');
 const nodemailer = require('nodemailer');
+const mailjet = require('node-mailjet');
 
 // Initialize Resend if API key is available (for local development)
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
-// Send email using Resend (commented for production, available for local dev)
+// Initialize Mailjet HTTP API client
+const mailjetClient = process.env.EMAIL_USER && process.env.EMAIL_PASS 
+  ? mailjet.connect(process.env.EMAIL_USER, process.env.EMAIL_PASS)
+  : null;
+
+// Send email using Mailjet HTTP API (primary for production)
+const sendViaMailjet = async (emailContent) => {
+  if (!mailjetClient) {
+    throw new Error('Mailjet client not initialized');
+  }
+
+  try {
+    const request = mailjetClient.post('send', { version: 'v3.1' }).request({
+      Messages: [{
+        From: {
+          Email: emailContent.from,
+          Name: 'D Weather'
+        },
+        To: [{
+          Email: emailContent.to
+        }],
+        Subject: emailContent.subject,
+        HTMLPart: emailContent.html,
+        TextPart: emailContent.text || emailContent.subject
+      }]
+    });
+
+    const result = await request;
+    console.log('Email sent successfully via Mailjet to:', emailContent.to);
+    return { success: true, message: 'Email sent successfully via Mailjet' };
+  } catch (error) {
+    console.error('Mailjet HTTP API error:', error);
+    throw error;
+  }
+};
+
+// Send email using Resend (fallback for local dev)
 const sendViaResend = async (emailContent) => {
   try {
     const { data, error } = await resend.emails.send({
@@ -28,7 +65,26 @@ const sendViaResend = async (emailContent) => {
 };
 
 // Create email transporter
-const createTransporter = () => {
+let cachedTransporter = null;
+
+// Verify SMTP transporter once and cache it
+const verifyTransporter = async () => {
+  if (cachedTransporter) return cachedTransporter;
+  const transporter = createTransporterInternal();
+  try {
+    await transporter.verify();
+    console.log('SMTP transporter verified successfully');
+    cachedTransporter = transporter;
+    return transporter;
+  } catch (err) {
+    console.error('SMTP verification failed:', err);
+    // If verification fails, keep cachedTransporter null so we can fallback to Resend
+    return null;
+  }
+};
+
+// Internal function that actually creates the nodemailer transporter (unchanged logic)
+const createTransporterInternal = () => {
   // Mailjet SMTP (Primary - French service)
   if (process.env.EMAIL_HOST && process.env.EMAIL_HOST.includes('mailjet.com')) {
     return nodemailer.createTransport({
@@ -54,7 +110,50 @@ const createTransporter = () => {
   });
 };
 
+// Public wrapper that returns a verified transporter or null
+const getVerifiedTransporter = async () => {
+  const transporter = await verifyTransporter();
+  return transporter;
+};
+
 const sendPasswordResetEmail = async (email, resetToken) => {
+  // Try Mailjet HTTP API first (production), fallback to SMTP (local), then Resend
+  if (mailjetClient && process.env.NODE_ENV === 'production') {
+    console.log('Using Mailjet HTTP API for password reset email');
+    const resetUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}/reset-password?token=${resetToken}`
+      : `http://localhost:3000/reset-password?token=${resetToken}`;
+    
+    const emailContent = {
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to: email,
+      subject: 'Reset your D Weather password',
+      html: `<p>Reset your password by clicking <a href="${resetUrl}">this link</a></p>`,
+      text: `Reset your password: ${resetUrl}`
+    };
+    
+    try {
+      return await sendViaMailjet(emailContent);
+    } catch (error) {
+      console.error('Mailjet failed, trying fallback methods:', error);
+    }
+  }
+
+  // Fallback to SMTP for local development
+  const transporter = await getVerifiedTransporter();
+  if (transporter) {
+    console.log('Using SMTP for password reset email');
+  } else if (resend) {
+    console.warn('SMTP not available, using Resend for password reset email');
+    const emailContent = {
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to: email,
+      subject: 'Reset your D Weather password',
+      html: `<p>Reset link: ${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/reset-password?token=${resetToken}` : `http://localhost:3000/reset-password?token=${resetToken}`}</p>`
+    };
+    return await sendViaResend(emailContent);
+  }
+
   const resetUrl = process.env.VERCEL_URL 
     ? `https://${process.env.VERCEL_URL}/reset-password?token=${resetToken}`
     : `http://localhost:3000/reset-password?token=${resetToken}`;
@@ -172,7 +271,10 @@ The D Weather Team
   };
 
   try {
-    const transporter = createTransporter();
+    if (!transporter) {
+      console.error('No valid SMTP transporter available for password reset email');
+      throw new Error('No valid email transporter');
+    }
     await transporter.sendMail(emailContent);
     console.log('Password reset email sent successfully to:', email);
     return {
@@ -201,6 +303,50 @@ The D Weather Team
 };
 
 const sendWelcomeEmail = async (email, username) => {
+  // Try Mailjet HTTP API first (production), fallback to SMTP (local), then Resend
+  if (mailjetClient && process.env.NODE_ENV === 'production') {
+    console.log('Using Mailjet HTTP API for welcome email');
+    const emailContent = {
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to: email,
+      subject: 'Welcome to D Weather!',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Welcome to D Weather!</h1>
+          </div>
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #2c5aa0;">Hello ${username}!</h2>
+            <p>Thank you for joining D Weather. You can now enjoy personalized weather forecasts.</p>
+            <a href="${process.env.VERCEL_URL || 'http://localhost:3000'}" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: bold;">Start Using D Weather</a>
+          </div>
+        </div>
+      `,
+      text: `Welcome to D Weather, ${username}! Visit ${process.env.VERCEL_URL || 'http://localhost:3000'} to get started.`
+    };
+    
+    try {
+      return await sendViaMailjet(emailContent);
+    } catch (error) {
+      console.error('Mailjet failed for welcome email, trying fallback methods:', error);
+    }
+  }
+
+  // Fallback to SMTP for local development
+  const transporter = await getVerifiedTransporter();
+  if (transporter) {
+    console.log('Using SMTP for welcome email');
+  } else if (resend) {
+    console.warn('SMTP not available, using Resend for welcome email');
+    const emailContent = {
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to: email,
+      subject: 'Welcome to D Weather!',
+      html: `<p>Welcome, ${username}!</p>`
+    };
+    return await sendViaResend(emailContent);
+  }
+
   // Welcome email for new registrations
   const emailContent = {
     from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
@@ -235,7 +381,10 @@ const sendWelcomeEmail = async (email, username) => {
   };
 
   try {
-    const transporter = createTransporter();
+    if (!transporter) {
+      console.error('No valid SMTP transporter available for welcome email');
+      throw new Error('No valid email transporter');
+    }
     await transporter.sendMail(emailContent);
     console.log('Welcome email sent successfully to:', email);
   } catch (error) {

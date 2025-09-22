@@ -179,18 +179,30 @@ app.post('/register', async (req, res) => {
       });
     }
     
+    // Check for existing username
     const existingUser = await findUserByUsername(username);
     if (existingUser) {
-      console.log('User already exists:', username);
+      console.log('Username already exists:', username);
       return res.render('register', { 
         error: 'Username already exists',
         userId: null,
         username: null
       });
     }
+    // Check for existing email
+    const existingEmailUser = await findUserByEmail(email);
+    if (existingEmailUser) {
+      console.log('Email already registered:', email);
+      return res.render('register', { 
+        error: 'Email already in use',
+        userId: null,
+        username: null
+      });
+    }
     
     console.log('Creating new user:', username, 'with email:', email);
-    const newUser = await createUser(username, password, email);
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await createUser(username, email, hashedPassword);
     console.log('User created successfully:', newUser);
     
     // Send welcome email
