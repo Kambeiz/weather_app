@@ -39,7 +39,7 @@ app.use(session({
   saveUninitialized: false,
   name: 'dweather.sid',
   cookie: { 
-    secure: false, // Disable secure for now to debug session issues
+    secure: process.env.NODE_ENV === 'production',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
     sameSite: 'lax'
@@ -51,7 +51,8 @@ app.use(session({
 // Custom middleware to check if user is authenticated
 const requireAuth = (req, res, next) => {
   console.log('Auth check - Session ID:', req.sessionID, 'User ID:', req.session.userId);
-  console.log('Full session data:', JSON.stringify(req.session, null, 2));
+  console.log('Cookie secure setting:', req.app.get('env') === 'production' ? 'true' : 'false');
+  console.log('Request protocol:', req.protocol, 'Headers:', req.get('x-forwarded-proto'));
   if (!req.session.userId) {
     console.log('No user ID in session, redirecting to login');
     return res.redirect('/login');
