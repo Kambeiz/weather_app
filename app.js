@@ -73,8 +73,12 @@ app.get('/login', (req, res) => {
   if (req.session.userId) {
     return res.redirect('/dashboard');
   }
+  const successMessage = req.query.registered === 'true' ? 
+    'Registration successful! Please log in with your credentials.' : null;
+    
   res.render('login', { 
     error: null,
+    success: successMessage,
     userId: null,
     username: null,
     query: req.query
@@ -215,12 +219,7 @@ app.post('/register', async (req, res) => {
       // Don't fail registration if email fails
     }
     
-    // Automatically log in the user after successful registration
-    req.session.userId = newUser.id;
-    req.session.username = newUser.username;
-    console.log('User automatically logged in after registration:', newUser.username);
-    
-    res.redirect('/dashboard');
+    res.redirect('/login?registered=true');
   } catch (error) {
     console.error('Registration error:', error);
     console.error('Registration error stack:', error.stack);
