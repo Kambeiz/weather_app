@@ -162,11 +162,25 @@ async function updateUserPassword(userId, hashedPassword) {
 }
 
 // Password reset functions
-async function createPasswordResetToken(userId, token, expiresAt) {
+async function createPasswordResetToken(email) {
+  const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
+  
+  // Find user by email to get userId
+  const user = await findUserByEmail(email);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  
+  // Remove any existing tokens for this user
+  await run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
+  
   await run(
     'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)',
-    [userId, token, expiresAt]
+    [user.id, token, expiresAt]
   );
+  
+  return token;
 }
 
 async function validatePasswordResetToken(token) {
