@@ -67,13 +67,6 @@ async function initializeDatabase() {
   console.log('Initializing database tables...');
   
   try {
-    // Drop all tables first for fresh start
-    await run('DROP TABLE IF EXISTS favorite_cities');
-    await run('DROP TABLE IF EXISTS password_reset_tokens');
-    await run('DROP TABLE IF EXISTS users');
-    await run('DROP TABLE IF EXISTS sessions');
-    console.log('All tables dropped for fresh database reset');
-
     // Create users table
     await run(`
       CREATE TABLE IF NOT EXISTS users (
@@ -122,7 +115,7 @@ async function initializeDatabase() {
       )
     `);
 
-    console.log('Database tables initialized successfully with fresh reset');
+    console.log('Database tables initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;

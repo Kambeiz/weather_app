@@ -40,6 +40,9 @@ const apiRoutes = require('./routes/api');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy for Vercel (CRITICAL for HTTPS and secure cookies)
+app.set('trust proxy', true);
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -89,12 +92,14 @@ app.use(session({
   saveUninitialized: false,
   name: 'dweather.sid',
   cookie: { 
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.NODE_ENV === 'production', // Works with trust proxy
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
-    sameSite: 'lax'
+    sameSite: 'lax',
+    path: '/'
   },
-  store: sessionStore // MySQL store created synchronously above
+  store: sessionStore, // MySQL store created synchronously above
+  proxy: process.env.NODE_ENV === 'production' // Trust the proxy in production
 }));
 
 // Custom middleware to check if user is authenticated
@@ -104,19 +109,11 @@ const requireAuth = (req, res, next) => {
   console.log('Cookie secure setting:', req.app.get('env') === 'production' ? 'true' : 'false');
   console.log('Request protocol:', req.protocol, 'Headers:', req.get('x-forwarded-proto'));
   
-  // Force session reload from store to ensure fresh data
-  req.session.reload((err) => {
-    if (err) {
-      console.error('Session reload error:', err);
-      return res.redirect('/login');
-    }
-    
-    console.log('Session after reload:', JSON.stringify(req.session, null, 2));
-    if (!req.session?.userId) {
-      return res.redirect('/login');
-    }
-    next();
-  });
+  // Check if user is authenticated (no reload needed - trust session middleware)
+  if (!req.session?.userId) {
+    return res.redirect('/login');
+  }
+  next();
 };
 
 // Routes
