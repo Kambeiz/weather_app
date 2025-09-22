@@ -39,7 +39,7 @@ app.use(session({
   saveUninitialized: false,
   name: 'dweather.sid',
   cookie: { 
-    secure: process.env.NODE_ENV === 'production' && process.env.VERCEL_URL ? true : false,
+    secure: false, // Disable secure for now to debug session issues
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
     sameSite: 'lax'
@@ -51,6 +51,7 @@ app.use(session({
 // Custom middleware to check if user is authenticated
 const requireAuth = (req, res, next) => {
   console.log('Auth check - Session ID:', req.sessionID, 'User ID:', req.session.userId);
+  console.log('Full session data:', JSON.stringify(req.session, null, 2));
   if (!req.session.userId) {
     console.log('No user ID in session, redirecting to login');
     return res.redirect('/login');
@@ -107,7 +108,7 @@ app.post('/login', async (req, res) => {
       });
     }
     
-    // Set session data
+    // Log in the user
     req.session.userId = user.id;
     req.session.username = user.username;
     
@@ -115,13 +116,11 @@ app.post('/login', async (req, res) => {
     req.session.save((err) => {
       if (err) {
         console.error('Session save error:', err);
-        return res.status(500).render('error', { 
-          message: 'Login failed - session error',
-          userId: null,
-          username: null
-        });
+      } else {
+        console.log('Session saved successfully');
       }
       console.log('User logged in successfully:', username, 'Session ID:', req.sessionID);
+      console.log('Session data after login:', JSON.stringify(req.session, null, 2));
       res.redirect('/dashboard');
     });
   } catch (error) {
