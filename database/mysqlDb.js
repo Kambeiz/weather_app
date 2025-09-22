@@ -6,12 +6,13 @@ const path = require('path');
 // Database connection pool
 let pool;
 
-const initializeMySQL = async () => {
+async function initializeMySQL() {
+  console.log('Initializing MySQL connection...');
+  
   try {
     // Read SSL certificate for Aiven
     const sslCA = fs.readFileSync(path.join(__dirname, 'ca-certificate.pem'));
     
-    // Create connection pool with timeout and retry settings
     pool = mysql.createPool({
       host: process.env.DB_HOST || 'localhost',
       user: process.env.DB_USER || 'root',
@@ -19,22 +20,22 @@ const initializeMySQL = async () => {
       database: process.env.DB_NAME || 'defaultdb',
       port: process.env.DB_PORT || 3306,
       waitForConnections: true,
-      connectionLimit: 5,
+      connectionLimit: 10,
       queueLimit: 0,
-      acquireTimeout: 60000,
-      timeout: 60000,
+      acquireTimeout: 120000, // 2 minutes
+      timeout: 120000, // 2 minutes
+      reconnect: true,
       ssl: process.env.NODE_ENV === 'production' ? { 
         ca: sslCA,
         rejectUnauthorized: true
       } : false
     });
 
-    console.log('Connected to MySQL database.');
-    
-    // Test connection with retry logic
-    let retries = 3;
+    // Test connection with extended retry logic for Aiven
+    let retries = 10; // More retries for Aiven connection
     while (retries > 0) {
       try {
+        console.log(`Attempting MySQL connection... (${11 - retries}/10)`);
         const connection = await pool.getConnection();
         await connection.ping();
         connection.release();
@@ -43,12 +44,20 @@ const initializeMySQL = async () => {
       } catch (error) {
         retries--;
         console.log(`MySQL connection test failed, retries left: ${retries}`);
-        if (retries === 0) throw error;
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('Error:', error.message);
+        if (retries === 0) {
+          console.error('MySQL connection failed after all retries:', error.message);
+          throw error;
+        }
+        // Exponential backoff: wait longer between retries
+        const waitTime = Math.min(5000 * (11 - retries), 30000); // Max 30 seconds
+        console.log(`Waiting ${waitTime/1000} seconds before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
-    
+
     await initializeDatabase();
+    console.log('MySQL database initialized successfully');
   } catch (error) {
     console.error('Error connecting to MySQL:', error);
     console.log('Will fallback to memory database for this session');
@@ -256,7 +265,8 @@ async function getUserFavoriteCities(userId) {
 // Initialize MySQL if environment variables are present
 if (process.env.DB_PASSWORD || process.env.NODE_ENV === 'production') {
   initializeMySQL().catch(error => {
-    console.error('MySQL initialization failed, continuing with memory database:', error.message);
+    console.error('MySQL initialization failed:', error.message);
+    process.exit(1); // Exit if MySQL fails - force wait for connection
   });
 }
 

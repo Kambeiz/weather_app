@@ -44,8 +44,8 @@ app.use(session({
     httpOnly: true,
     sameSite: 'lax'
   },
-  // Use memory store if MySQL fails
-  store: undefined // Always use MemoryStore for now to avoid MySQL connection issues
+  // Add session store configuration for production
+  store: process.env.NODE_ENV === 'production' ? createMySQLSessionStore() : undefined
 }));
 
 // Custom middleware to check if user is authenticated
