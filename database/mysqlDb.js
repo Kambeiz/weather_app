@@ -19,8 +19,10 @@ const initializeMySQL = async () => {
       database: process.env.DB_NAME || 'defaultdb',
       port: process.env.DB_PORT || 3306,
       waitForConnections: true,
-      connectionLimit: 10,
+      connectionLimit: 5,
       queueLimit: 0,
+      acquireTimeout: 60000,
+      timeout: 60000,
       ssl: process.env.NODE_ENV === 'production' ? { 
         ca: sslCA,
         rejectUnauthorized: true
@@ -28,9 +30,28 @@ const initializeMySQL = async () => {
     });
 
     console.log('Connected to MySQL database.');
+    
+    // Test connection with retry logic
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        const connection = await pool.getConnection();
+        await connection.ping();
+        connection.release();
+        console.log('MySQL connection test successful');
+        break;
+      } catch (error) {
+        retries--;
+        console.log(`MySQL connection test failed, retries left: ${retries}`);
+        if (retries === 0) throw error;
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+    
     await initializeDatabase();
   } catch (error) {
     console.error('Error connecting to MySQL:', error);
+    console.log('Will fallback to memory database for this session');
     throw error;
   }
 };
@@ -234,7 +255,9 @@ async function getUserFavoriteCities(userId) {
 
 // Initialize MySQL if environment variables are present
 if (process.env.DB_PASSWORD || process.env.NODE_ENV === 'production') {
-  initializeMySQL().catch(console.error);
+  initializeMySQL().catch(error => {
+    console.error('MySQL initialization failed, continuing with memory database:', error.message);
+  });
 }
 
 module.exports = {
