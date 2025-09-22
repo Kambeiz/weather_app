@@ -107,12 +107,24 @@ app.get('/login', (req, res) => {
 
 app.post('/login', async (req, res) => {
   try {
-    console.log('Login attempt for:', req.body.username);
+    console.log('=== LOGIN EVENT START ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('Session ID before login:', req.sessionID);
+    console.log('Session object before login:', JSON.stringify(req.session, null, 2));
+    console.log('Session store status:', req.sessionStore ? 'Available' : 'Not available');
+    console.log('Cookies:', JSON.stringify(req.cookies, null, 2));
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    
     const { username, password } = req.body;
+    console.log('Login attempt for username:', username);
+    
+    // Database lookup
+    console.log('Looking up user in database...');
     const user = await findUserByUsername(username);
     
     if (!user) {
-      console.log('User not found:', username);
+      console.log('❌ User not found in database:', username);
       return res.render('login', { 
         error: 'Invalid username or password',
         userId: null,
@@ -121,10 +133,19 @@ app.post('/login', async (req, res) => {
       });
     }
     
+    console.log('✅ User found:', {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      hasPassword: !!user.password
+    });
+    
+    // Password verification
+    console.log('Verifying password...');
     const isMatch = await bcrypt.compare(password, user.password);
     
     if (!isMatch) {
-      console.log('Password mismatch for user:', username);
+      console.log('❌ Password mismatch for user:', username);
       return res.render('login', { 
         error: 'Invalid username or password',
         userId: null,
@@ -133,19 +154,35 @@ app.post('/login', async (req, res) => {
       });
     }
     
-    // Log in the user
+    console.log('✅ Password verified successfully');
+    
+    // Session handling
+    console.log('Setting up session...');
     if (req.session) {
+      console.log('Session object exists, setting user data...');
       req.session.userId = user.id;
       req.session.username = user.username;
       
+      console.log('Session data set:', {
+        userId: req.session.userId,
+        username: req.session.username,
+        sessionID: req.sessionID
+      });
+      
       // Force session save before redirect
+      console.log('Saving session...');
       req.session.save((err) => {
         if (err) {
-          console.error('Session save error:', err);
+          console.error('❌ Session save error:', err);
           console.error('Session save error details:', {
             code: err.code,
             message: err.message,
-            stack: err.stack
+            stack: err.stack,
+            name: err.name
+          });
+          console.error('Session store details:', {
+            storeType: req.sessionStore.constructor.name,
+            storeReady: typeof req.sessionStore.ready === 'function' ? req.sessionStore.ready() : 'unknown'
           });
           return res.status(500).render('login', { 
             error: 'Login failed due to session error. Please try again.',
@@ -154,16 +191,18 @@ app.post('/login', async (req, res) => {
             query: req.query
           });
         } else {
-          console.log('Session saved successfully');
+          console.log('✅ Session saved successfully');
+          console.log('Final session data:', JSON.stringify(req.session, null, 2));
+          console.log('Session ID after save:', req.sessionID);
+          console.log('=== LOGIN EVENT SUCCESS ===');
+          res.redirect('/dashboard');
         }
-        console.log('User logged in successfully:', username, 'Session ID:', req.sessionID);
-        console.log('Session data after login:', JSON.stringify(req.session, null, 2));
-        res.redirect('/dashboard');
       });
     } else {
-      console.error('Session not available during login');
+      console.error('❌ Session not available during login');
       console.error('Session object:', req.session);
       console.error('Session ID:', req.sessionID);
+      console.error('Session store:', req.sessionStore);
       res.status(500).render('login', { 
         error: 'Session initialization failed. Please try again.',
         userId: null,
@@ -172,7 +211,15 @@ app.post('/login', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('❌ LOGIN ERROR:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      errno: error.errno
+    });
+    console.log('=== LOGIN EVENT FAILED ===');
     res.status(500).render('error', { 
       message: 'An error occurred during login',
       userId: null,
