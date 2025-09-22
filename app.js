@@ -50,23 +50,21 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('layout', 'layout');
 
-// Session configuration function to be called after store initialization
-function configureSession() {
-  app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
-    resave: false,
-    saveUninitialized: false,
-    name: 'dweather.sid',
-    cookie: { 
-      secure: false,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      httpOnly: true,
-      sameSite: 'lax'
-    },
-    // Use the initialized session store
-    store: sessionStore
-  }));
-}
+// Configure session middleware immediately with fallback
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  name: 'dweather.sid',
+  cookie: { 
+    secure: false,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    httpOnly: true,
+    sameSite: 'lax'
+  },
+  // Start with memory store, will be replaced if MySQL store initializes
+  store: sessionStore || undefined
+}));
 
 // Custom middleware to check if user is authenticated
 const requireAuth = (req, res, next) => {
@@ -521,30 +519,20 @@ app.use((req, res) => {
   res.status(404).render('error', { message: 'Page not found' });
 });
 
-// Initialize app asynchronously
-async function initializeApp() {
-  try {
-    // Initialize session store first
-    await initializeSessionStore();
-    
-    // Configure session middleware after store is ready
-    configureSession();
-    
-    console.log('App initialization complete');
-    
-    // Start server locally
-    if (process.env.NODE_ENV !== 'production') {
-      app.listen(PORT, () => {
-        console.log(`Server is running on http://localhost:${PORT}`);
-      });
-    }
-  } catch (error) {
-    console.error('Failed to initialize app:', error);
-    process.exit(1);
-  }
+// Initialize session store in background for production
+if (process.env.NODE_ENV === 'production') {
+  initializeSessionStore().then(() => {
+    console.log('Background session store initialization complete');
+  }).catch(error => {
+    console.error('Background session store initialization failed:', error);
+  });
 }
 
-// Initialize the app
-initializeApp();
+// Start server locally
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
+}
 
 module.exports = app;
