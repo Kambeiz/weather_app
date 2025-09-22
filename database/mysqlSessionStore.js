@@ -13,20 +13,7 @@ const createMySQLSessionStore = async () => {
     // Read SSL certificate for Aiven
     const sslCA = fs.readFileSync(path.join(__dirname, 'ca-certificate.pem'));
     
-    // First ensure the sessions table exists
-    const connection = mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      ssl: process.env.NODE_ENV === 'production' ? { 
-        ca: sslCA,
-        rejectUnauthorized: true
-      } : false
-    });
-
-    await connection.end();
+    // Verify connection without creating unnecessary connection
     console.log('Session store connection verified');
     
     const options = {

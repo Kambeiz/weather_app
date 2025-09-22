@@ -22,9 +22,6 @@ async function initializeMySQL() {
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
-      acquireTimeout: 120000, // 2 minutes
-      timeout: 120000, // 2 minutes
-      reconnect: true,
       ssl: process.env.NODE_ENV === 'production' ? { 
         ca: sslCA,
         rejectUnauthorized: true
